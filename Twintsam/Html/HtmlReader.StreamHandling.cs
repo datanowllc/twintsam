@@ -4,6 +4,7 @@ using System.Text;
 using System.Xml;
 using System.IO;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace Twintsam.Html
 {
@@ -19,6 +20,13 @@ namespace Twintsam.Html
         private int _linePosition;
 
         private char NextInputChar { get { return PeekChar(0); } }
+
+        private char EatNextInputChar()
+        {
+            char c = NextInputChar;
+            EatChars(1);
+            return c;
+        }
 
         private char PeekChar(int offset)
         {
@@ -48,6 +56,8 @@ namespace Twintsam.Html
 
         private void EatChars(int count)
         {
+            Debug.Assert(count > 0, String.Format(CultureInfo.InvariantCulture, "HtmlReader.EatChars called with non-positive argument: {0}.", count));
+
             char[] chars = new char[count];
             _buffer.CopyTo(0, chars, 0, count);
             _buffer.Remove(0, count);
