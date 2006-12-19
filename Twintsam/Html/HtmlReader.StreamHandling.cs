@@ -11,6 +11,7 @@ namespace Twintsam.Html
     public partial class HtmlReader : IXmlLineInfo
     {
         private const char EOF_CHAR = '\0';
+        private const char REPLACEMENT_CHAR = '\uFFFD';
 
         private TextReader _reader;
         private bool _readerAtEof;
@@ -43,7 +44,7 @@ namespace Twintsam.Html
 
                     _buffer.Append(chars, 0, charsRead);
 
-                    _buffer.Replace('\0', '\uFFFE');
+                    _buffer.Replace('\0', REPLACEMENT_CHAR);
                     _buffer.Replace("\r\n", "\n");
                     _buffer.Replace('\r', '\n');
                 }

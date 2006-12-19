@@ -46,6 +46,7 @@
     <Compile Include="Html\HtmlReader.cs" />
     <Compile Include="Html\HtmlReader.StreamHandling.cs" />
     <Compile Include="Html\HtmlReader.Tokenization.cs" />
+    <Compile Include="Html\HtmlReader.Tokenization.Entities.cs" />
     <Compile Include="Html\ParseErrorEventArgs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
