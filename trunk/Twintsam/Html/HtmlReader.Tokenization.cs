@@ -36,6 +36,8 @@ namespace Twintsam.Html
         private string _value;
         private List<Attribute> _attributes = new List<Attribute>();
 
+        private string _lastEmittedStartTagName;
+
         private class Attribute
         {
             public string name;
@@ -55,7 +57,11 @@ namespace Twintsam.Html
                 || tokenType == XmlNodeType.Text
                 || tokenType == XmlNodeType.Comment);
 
-            this._tokenType = tokenType;
+            if (_tokenType == XmlNodeType.Element) {
+                _lastEmittedStartTagName = _name;
+            }
+
+            _tokenType = tokenType;
             _name = null;
             _value = null;
             _attributes.Clear();
@@ -105,7 +111,52 @@ namespace Twintsam.Html
                         sb.Append(entityValue);
                     }
                 } else if (c == '<' && ContentModel != ContentModel.PlainText) {
-                    _currentTokenizationState = ParseStartTag;
+                    // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
+                    // Tag open state is only switched to from the data state,
+                    // so integrate the algorithm here instead of within a new method
+                    switch (ContentModel) {
+                    case ContentModel.Rcdata:
+                    case ContentModel.Cdata:
+                        if (NextInputChar == '/') {
+                            EatChars(1);
+                            // TODO: integrate "close tag open state" http://www.whatwg.org/specs/web-apps/current-work/#close1
+                            //StringBuilder tagName = new StringBuilder(_lastEmittedStartTagName.Length);
+                            //char c2 = NextInputChar;
+                            //int offset = 0;
+                            //while (offset < _lastEmittedStartTagName.Length && c2 != EOF_CHAR) {
+                            //    tagName.Append(c2);
+                            //    c2 = PeekChar(++offset);
+                            //}
+                            _currentTokenizationState = ParseEndTag;
+                        } else {
+                            sb.Append(c);
+                        }
+                        break;
+                    case ContentModel.Pcdata:
+                        if (NextInputChar == '!') {
+                            EatChars(1);
+                            _currentTokenizationState = ParseMarkupDeclaration;
+                        } else if (NextInputChar == '/') {
+                            EatChars(1);
+                            _currentTokenizationState = ParseEndTag;
+                        } else if (('A' <= NextInputChar && NextInputChar <= 'Z')
+                            || ('a' <= NextInputChar && NextInputChar <= 'z')) {
+                            InitToken(XmlNodeType.Element);
+                            _currentTokenizationState = ParseStartTag;
+                        } else if (NextInputChar == '>') {
+                            OnParseError("Empty tag or unescaped <>");
+                            EatChars(1);
+                            sb.Append("<>");
+                            _currentTokenizationState = ParseData;
+                        } else if (NextInputChar == '?') {
+                            OnParseError("Bogus comment");
+                            _currentTokenizationState = ParseBogusComment;
+                        } else {
+                            OnParseError("Unescaped <");
+                            sb.Append(c);
+                        }
+                        break;
+                    }
                 } else if (c == EOF_CHAR) {
                     break;
                 } else {
@@ -122,8 +173,22 @@ namespace Twintsam.Html
             }
         }
 
-        // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
         private bool ParseStartTag()
+        {
+            throw new NotImplementedException();
+        }
+
+        private bool ParseEndTag()
+        {
+            throw new NotImplementedException();
+        }
+
+        private bool ParseBogusComment()
+        {
+            throw new NotImplementedException();
+        }
+
+        private bool ParseMarkupDeclaration()
         {
             throw new NotImplementedException();
         }
