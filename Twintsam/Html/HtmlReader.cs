@@ -18,7 +18,7 @@ namespace Twintsam.Html
         {
             // http://www.whatwg.org/specs/web-apps/current-work/#tokenization:
             // The state machine must start in the data state.
-            _currentTokenizationState = ParseData;
+            _currentParsingFunction = ParseData;
         }
         #endregion
 
