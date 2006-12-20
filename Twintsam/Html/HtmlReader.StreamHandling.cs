@@ -20,6 +20,8 @@ namespace Twintsam.Html
         private int _lineNumber;
         private int _linePosition;
 
+        private bool EndOfStream { get { return _buffer.Length == 0 && _readerAtEof; } }
+
         private char NextInputChar { get { return PeekChar(0); } }
 
         private char EatNextInputChar()
@@ -53,6 +55,22 @@ namespace Twintsam.Html
                 return EOF_CHAR;
             }
             return _buffer[offset];
+        }
+
+        private string PeekChars(int count)
+        {
+            return PeekChars(0, count);
+        }
+
+        private string PeekChars(int offset, int count)
+        {
+            // ensure we have enough chars in the buffer
+            char c = PeekChar(offset + count - 1);
+            // if we reached EOF, we probably won't be able to peek 'count' chars
+            if (c == EOF_CHAR) {
+                count = _buffer.Length - offset;
+            }
+            return _buffer.ToString(offset, count);
         }
 
         private void EatChars(int count)
