@@ -8,6 +8,14 @@ namespace Twintsam
     {
         public const string XhtmlNamespaceUri = "http://www.w3.org/199/xhtml";
 
+        // http://www.whatwg.org/specs/web-apps/current-work/#space
+        public const string SpaceCharacters = " \t\n\v\f\r";
+
+        public static bool IsSpaceCharacter(char c)
+        {
+            return SpaceCharacters.IndexOf(c) >= 0;
+        }
+
         public static readonly string[] VoidElements = {
             "base", "link", "meta", "hr", "br", "img", "embed", "param", "area", "col", "input",
         };
