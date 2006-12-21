@@ -142,6 +142,14 @@ namespace Twintsam.Html
             return count;
         }
 
+        private string EatCharsToEnd()
+        {
+            _buffer.Append(_reader.ReadToEnd());
+            string chars = _buffer.ToString();
+            _buffer.Length = 0;
+            return chars;
+        }
+
         private bool SkipChars(Predicate<char> condition)
         {
             int offset = 0;
