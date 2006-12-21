@@ -73,6 +73,29 @@ namespace Twintsam.Html
             return _buffer.ToString(offset, count);
         }
 
+        private string PeekChars(Predicate<char> condition)
+        {
+            StringBuilder sb = new StringBuilder();
+            PeekChars(sb, condition);
+            return sb.ToString();
+        }
+        private string PeekChars(Predicate<char> condition, int estimatedLength)
+        {
+            StringBuilder sb = new StringBuilder(estimatedLength);
+            PeekChars(sb, condition);
+            return sb.ToString();
+        }
+        private int PeekChars(StringBuilder sb, Predicate<char> condition)
+        {
+            int offset = 0;
+            char c = PeekChar(offset);
+            while (c != EOF_CHAR && condition(c)) {
+                sb.Append(c);
+                c = PeekChar(++offset);
+            }
+            return offset;
+        }
+
         private void EatChars(int count)
         {
             Debug.Assert(count > 0, String.Format(CultureInfo.InvariantCulture, "HtmlReader.EatChars called with non-positive argument: {0}.", count));
@@ -90,6 +113,19 @@ namespace Twintsam.Html
                     _linePosition++;
                 }
             });
+        }
+
+        private int SkipChars(Predicate<char> condition)
+        {
+            int offset = 0;
+            char c = NextInputChar;
+            while (c != EOF_CHAR && condition(c)) {
+                c = PeekChar(++offset);
+            }
+            if (offset > 0) {
+                EatChars(offset);
+            }
+            return offset;
         }
 
         #region IXmlLineInfo Members
