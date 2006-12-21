@@ -27,7 +27,9 @@ namespace Twintsam.Html
         private char EatNextInputChar()
         {
             char c = NextInputChar;
-            EatChars(1);
+            if (c != EOF_CHAR) {
+                EatChars(1);
+            }
             return c;
         }
 
@@ -115,7 +117,32 @@ namespace Twintsam.Html
             });
         }
 
-        private int SkipChars(Predicate<char> condition)
+        private string EatChars(Predicate<char> condition)
+        {
+            string chars = PeekChars(condition);
+            if (chars.Length > 0) {
+                EatChars(chars.Length);
+            }
+            return chars;
+        }
+        private string EatChars(Predicate<char> condition, int estimatedLength)
+        {
+            string chars = PeekChars(condition, estimatedLength);
+            if (chars.Length > 0) {
+                EatChars(chars.Length);
+            }
+            return chars;
+        }
+        private int EatChars(StringBuilder sb, Predicate<char> condition)
+        {
+            int count = PeekChars(sb, condition);
+            if (count > 0) {
+                EatChars(count);
+            }
+            return count;
+        }
+
+        private bool SkipChars(Predicate<char> condition)
         {
             int offset = 0;
             char c = NextInputChar;
@@ -125,7 +152,7 @@ namespace Twintsam.Html
             if (offset > 0) {
                 EatChars(offset);
             }
-            return offset;
+            return offset != 0;
         }
 
         #region IXmlLineInfo Members
