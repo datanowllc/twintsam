@@ -39,7 +39,7 @@ namespace Twintsam.Html
 
         private string _lastEmittedStartTagName;
 
-        private class Attribute
+        private struct Attribute
         {
             public string name;
             public string value;
@@ -90,13 +90,6 @@ namespace Twintsam.Html
             bool newToken = false;
             while (!newToken && !EndOfStream) {
                 newToken = _currentParsingFunction();
-            }
-            // Paragraph just before http://www.whatwg.org/specs/web-apps/current-work/#permitted:
-            // When an end tag token is emitted with attributes, that is a parse error
-            if (newToken
-                && _tokenType == XmlNodeType.EndElement
-                && _attributes != null && _attributes.Count > 0) {
-                OnParseError(Resources.Html_ParseError_EndTagWithAttributes);
             }
             return newToken;
         }
@@ -277,12 +270,135 @@ namespace Twintsam.Html
 
         private bool ParseStartTag()
         {
-            throw new NotImplementedException();
+            InitToken(XmlNodeType.Element);
+            ParseTag();
+            return true;
         }
 
         private bool ParseEndTag()
         {
-            throw new NotImplementedException();
+            InitToken(XmlNodeType.EndElement);
+            ParseTag();
+            // Paragraphs just before http://www.whatwg.org/specs/web-apps/current-work/#permitted:
+            // When an end tag token is emitted, the content model flag must be switched to the PCDATA state.
+            ContentModel = ContentModel.Pcdata;
+            // When an end tag token is emitted with attributes, that is a parse error
+            if (_attributes.Count > 0) {
+                OnParseError(Resources.Html_ParseError_EndTagWithAttributes);
+            }
+            return true;
+        }
+
+        private void ParseTag()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/#tag-name0
+            _name = EatChars(delegate(char c) {
+                return c != '>' && c != '<' && c != '/' && !Constants.IsSpaceCharacter(c);
+            });
+            _name = _name.ToLowerInvariant();
+
+            bool seenSlash = false; // flag to notify "non permitted slashes" only once per start tag
+
+            // the only "exit state" is ParseData
+            while (_currentParsingFunction != ParseData && !EndOfStream) {
+                // http://www.whatwg.org/specs/web-apps/current-work/#before
+                SkipChars(Constants.IsSpaceCharacter);
+                switch (NextInputChar) {
+                case '/':
+                    EatChars(1); // Eat SOLIDUS
+                    // http://www.whatwg.org/specs/web-apps/current-work/#permitted
+                    if (!seenSlash && (_tokenType != XmlNodeType.Element || NextInputChar != '>' || !Constants.IsVoidElement(_name))) {
+                        OnParseError("Illformed start tag: contains /");
+                        seenSlash = true;
+                    }
+                    break;
+                case '<':
+                    EatChars(1); // Eat LESS-THAN SIGN
+                    OnParseError("Illformed start tag: contains <");
+                    _currentParsingFunction = ParseData;
+                    break;
+                case '>':
+                    EatChars(1); // Eat GREATER-THAN SIGN
+                    _currentParsingFunction = ParseData;
+                    break;
+                case '=':
+                case '"':
+                case '\'':
+                case '&':
+                    EatChars(1); // Eat EQUALS SIGN, QUOTATION MARK, APOSTROPHE or AMPERSAND
+                    // NEW: standalone =, " or ' in start tag
+                    if (!seenSlash) {
+                        OnParseError("Illformed start tag: contains " + NextInputChar);
+                        seenSlash = true;
+                    }
+                    break;
+                default:
+                    if (!EndOfStream) {
+                        ParseAttribute();
+                    }
+                    break;
+                }
+            }
+        }
+
+        private void ParseAttribute()
+        {
+            Attribute attr = new Attribute();
+            attr.quoteChar = ' ';
+
+            attr.name = EatChars(delegate(char c)
+            {
+                return c != '=' && c != '>' && c != '<' && !Constants.IsSpaceCharacter(c)
+                    // NEW: add ", & and ' to "end of attribute name" signal
+                    /*&& c != '"' && c != '&' && c != '\''*/;
+            });
+            attr.name = attr.name.ToLowerInvariant();
+
+            SkipChars(Constants.IsSpaceCharacter);
+            if (NextInputChar == '=') {
+                EatChars(1); // Eat EQUALS SIGN
+                SkipChars(Constants.IsSpaceCharacter);
+                if (!EndOfStream) {
+                    char next = NextInputChar;
+                    if (next != '<' && next != '>') {
+                        Predicate<char> condition;
+                        if (next == '"' || next == '\'') {
+                            EatChars(1); // Eat QUOTATION MARK or APOSTROPHE
+                            attr.quoteChar = next;
+                            condition = delegate(char c) { return c != next && c != '&'; };
+                        } else {
+                            attr.quoteChar = ' ';
+                            condition = delegate(char c)
+                            {
+                                return c != '&' && c != '<' && c != '>' && !Constants.IsSpaceCharacter(c);
+                            };
+                        }
+                        StringBuilder sb = new StringBuilder();
+                        do {
+                            EatChars(condition);
+                            if (NextInputChar == '&') {
+                                EatChars(1); // Eat AMPERSAND
+                                string entityValue = EatEntity();
+                                if (String.IsNullOrEmpty(entityValue)) {
+                                    sb.Append('&');
+                                } else {
+                                    sb.Append(entityValue);
+                                }
+                            }
+                        } while (!EndOfStream && (NextInputChar == '&' || condition(NextInputChar)));
+                        attr.value = sb.ToString();
+                        if (!EndOfStream && attr.quoteChar != ' ') {
+                            EatChars(1); // Eat QUOTATION MARK or APOSTROPHE
+                        }
+                    }
+                }
+            }
+
+            if (_attributes.Exists(delegate(Attribute a) { return attr.name == a.name; })) {
+                OnParseError("Duplicate attribute: " + attr.name);
+            } else {
+                _attributes.Add(attr);
+            }
         }
 
         // http://www.whatwg.org/specs/web-apps/current-work/#bogus
