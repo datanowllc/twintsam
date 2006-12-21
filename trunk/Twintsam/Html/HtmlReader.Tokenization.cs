@@ -472,10 +472,6 @@ namespace Twintsam.Html
                     });
                     EatChars(_name.Length);
 
-                    if (Char.IsLower(_name, 0)) {
-                        // XXX: I don't know why, but the spec says so...
-                        _doctypeInError = true;
-                    }
                     _name = _name.ToUpperInvariant();
                     if (_name == "HTML") {
                         _doctypeInError = true;
