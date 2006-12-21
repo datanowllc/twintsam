@@ -473,9 +473,7 @@ namespace Twintsam.Html
                     EatChars(_name.Length);
 
                     _name = _name.ToUpperInvariant();
-                    if (_name == "HTML") {
-                        _doctypeInError = true;
-                    }
+                    _doctypeInError = (_name != "HTML");
 
                     // http://www.whatwg.org/specs/web-apps/current-work/#after0
                     SkipChars(Constants.IsSpaceCharacter);
