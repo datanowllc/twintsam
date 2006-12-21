@@ -104,97 +104,168 @@ namespace Twintsam.Html
         // http://www.whatwg.org/specs/web-apps/current-work/#data-state
         private bool ParseData()
         {
+            switch (ContentModel) {
+            case ContentModel.Pcdata:
+                return ParsePcdata();
+            case ContentModel.Rcdata:
+                return ParseRcdata();
+            case ContentModel.Cdata:
+                return ParseCdata();
+            case ContentModel.PlainText:
+            default:
+                string s = this.EatCharsToEnd();
+                if (s.Length > 0) {
+                    InitToken(XmlNodeType.Text);
+                    _value = s;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        private bool ParseCdata()
+        {
             StringBuilder sb = new StringBuilder();
-            do {
-                char c = EatNextInputChar();
-                if (c == '&' && (ContentModel == ContentModel.Pcdata || ContentModel == ContentModel.Rcdata)) {
-                    // http://www.whatwg.org/specs/web-apps/current-work/#entity:
-                    // Entity data state is only switched to from the data state,
-                    // so integrate the algorithm here instead of within a new method
+            while (_currentParsingFunction == ParseData && !EndOfStream) {
+                // http://www.whatwg.org/specs/web-apps/current-work/#data-state
+                EatChars(sb, delegate(char c) { return c != '/'; });
+                // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
+                if (!EndOfStream && sb.Length > 0 && sb[sb.Length - 1] == '<') {
+                    // found </
+                    // http://www.whatwg.org/specs/web-apps/current-work/#close1
+                    char c = PeekChar(_lastEmittedStartTagName.Length);
+                    if (String.Equals(PeekChars(_lastEmittedStartTagName.Length), _lastEmittedStartTagName, StringComparison.InvariantCultureIgnoreCase)
+                        && (Constants.IsSpaceCharacter(c) || c == '>' || c == '/' || c == '<' || c == EOF_CHAR)) {
+                        _currentParsingFunction = ParseEndTag;
+                    } else {
+                        OnParseError("Unescaped </ in CDATA");
+                        sb.Append('/'); // LESS-THAN SIGN has already been eaten
+                    }
+                }
+            }
+            if (sb.Length > 0) {
+                InitToken(XmlNodeType.Text);
+                _value = sb.ToString();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        private bool ParseRcdata()
+        {
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParseData && !EndOfStream) {
+                // http://www.whatwg.org/specs/web-apps/current-work/#data-state
+                EatChars(sb, delegate(char c) { return c != '<' && c != '&'; });
+                // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
+                char next = EatNextInputChar();
+                if (next == '&') {
+                    // http://www.whatwg.org/specs/web-apps/current-work/#entity
                     string entityValue = EatEntity();
                     if (String.IsNullOrEmpty(entityValue)) {
-                        sb.Append(c);
+                        // NEW: Unescaped & in RCDATA
+                        OnParseError("Unescaped & in RCDATA");
+                        sb.Append('&');
                     } else {
                         sb.Append(entityValue);
                     }
-                } else if (c == '<' && ContentModel != ContentModel.PlainText) {
-                    // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
-                    // Tag open state is only switched to from the data state,
-                    // so integrate the algorithm here instead of within a new method
-                    switch (ContentModel) {
-                    case ContentModel.Rcdata:
-                    case ContentModel.Cdata:
-                        if (NextInputChar == '/') {
-                            c = EatNextInputChar();
-                            // http://www.whatwg.org/specs/web-apps/current-work/#close1
-                            if (('A' <= NextInputChar && NextInputChar <= 'Z') || ('a' <= NextInputChar && NextInputChar <= 'z')) {
-                                string tagName = PeekChars(_lastEmittedStartTagName.Length);
-                                char next = PeekChar(tagName.Length);
-                                if (!String.Equals(_lastEmittedStartTagName, tagName, StringComparison.OrdinalIgnoreCase)
-                                    || (!Constants.IsSpaceCharacter(next) && next != '>' && next != '/' && next != '<' && next != EOF_CHAR)) {
-                                    OnParseError("Found end tag with different name than the previous start tag");
-                                    sb.Append("</");
-                                } else {
-                                    _currentParsingFunction = ParseEndTag;
-                                }
-                            } else if (NextInputChar == '>') {
-                                OnParseError("Empty end tag or unescaped </>");
-                            } else if (NextInputChar == EOF_CHAR) {
-                                OnParseError("Unexpected end of file");
-                                sb.Append("</");
-                                // let the next loop iteration handle EOF
+                } else if (next == '<') {
+                    // http://www.whatwg.org/specs/web-apps/current-work/#close1
+                    if (NextInputChar != '/') {
+                        // NEW: Unescaped < in RCDATA
+                        OnParseError("Unescaped < in RCDATA");
+                        sb.Append('<');
+                    } else {
+                        EatChars(1); // Eat SOLIDUS
+                        char c = PeekChar(_lastEmittedStartTagName.Length);
+                        if (String.Equals(PeekChars(_lastEmittedStartTagName.Length), _lastEmittedStartTagName, StringComparison.InvariantCultureIgnoreCase)
+                            && (Constants.IsSpaceCharacter(c) || c == '>' || c == '/' || c == '<' || c == EOF_CHAR)) {
+                            _currentParsingFunction = ParseEndTag;
+                        } else {
+                            OnParseError("Unescaped </ in CDATA");
+                            sb.Append("</");
+                        }
+                    }
+                }
+            }
+            if (sb.Length > 0) {
+                InitToken(XmlNodeType.Text);
+                _value = sb.ToString();
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        private bool ParsePcdata()
+        {
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParseData && !EndOfStream) {
+                // http://www.whatwg.org/specs/web-apps/current-work/#data-state
+                EatChars(sb, delegate(char c) { return c != '<' && c != '&'; });
+                // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
+                char next = EatNextInputChar();
+                if (next == '&') {
+                    // http://www.whatwg.org/specs/web-apps/current-work/#entity
+                    string entityValue = EatEntity();
+                    if (String.IsNullOrEmpty(entityValue)) {
+                        // NEW: Unescaped & in PCDATA
+                        OnParseError("Unescaped & in PCDATA");
+                        sb.Append('&');
+                    } else {
+                        sb.Append(entityValue);
+                    }
+                } else if (next == '<') {
+                    switch (NextInputChar) {
+                    case '!':
+                        EatChars(1); // Eat EXCLAMATION MARK
+                        _currentParsingFunction = ParseMarkupDeclaration;
+                        break;
+                    case '/':
+                        EatChars(1); // Eat SOLIDUS
+                        // http://www.whatwg.org/specs/web-apps/current-work/#close1
+                        switch (NextInputChar) {
+                        case '>':
+                            EatChars(1); // Eat GREATER-THAN-SIGN
+                            OnParseError("End tag without a name");
+                            break;
+                        case EOF_CHAR:
+                            OnParseError("Unexpected end of file in PCDATA");
+                            sb.Append("</");
+                            break;
+                        default:
+                            if (('a' <= next && next <= 'z') || ('A' <= next && next <= 'Z')) {
+                                _currentParsingFunction = ParseEndTag;
                             } else {
+                                // NEW: do not consume the next character (bogus comment in PCDATA)
                                 OnParseError("Bogus comment");
                                 _currentParsingFunction = ParseBogusComment;
                             }
-                        } else {
-                            sb.Append(c);
+                            break;
                         }
                         break;
-                    case ContentModel.Pcdata:
-                        if (NextInputChar == '!') {
-                            c = EatNextInputChar();
-                            _currentParsingFunction = ParseMarkupDeclaration;
-                        } else if (NextInputChar == '/') {
-                            c = EatNextInputChar();
-                            // http://www.whatwg.org/specs/web-apps/current-work/#close1
-                            if (('A' <= NextInputChar && NextInputChar <= 'Z') || ('a' <= NextInputChar && NextInputChar <= 'z')) {
-                                _currentParsingFunction = ParseEndTag;
-                            } else if (NextInputChar == '>') {
-                                OnParseError("Empty end tag or unescaped </>");
-                            } else if (NextInputChar == EOF_CHAR) {
-                                OnParseError("Unexpected end of file");
-                                sb.Append("</");
-                                // let the next loop iteration handle EOF
-                            } else {
-                                OnParseError("Bogus comment");
-                                _currentParsingFunction = ParseBogusComment;
-                            }
-                        } else if (('A' <= NextInputChar && NextInputChar <= 'Z')
-                            || ('a' <= NextInputChar && NextInputChar <= 'z')) {
-                            InitToken(XmlNodeType.Element);
+                    case '>':
+                        EatChars(1); // Eat GREATER-THAN SIGN
+                        OnParseError("Unescaped <> in PCDATA");
+                        sb.Append("<>");
+                        break;
+                    case '?':
+                        EatChars(1); // Eat QUESTION MARK
+                        _currentParsingFunction = ParseBogusComment;
+                        break;
+                    default:
+                        if (('a' <= next && next <= 'z') || ('A' <= next && next <= 'Z')) {
                             _currentParsingFunction = ParseStartTag;
-                        } else if (NextInputChar == '>') {
-                            OnParseError("Empty tag or unescaped <>");
-                            c = EatNextInputChar();
-                            sb.Append("<>");
-                            _currentParsingFunction = ParseData;
-                        } else if (NextInputChar == '?') {
-                            OnParseError("Bogus comment");
-                            _currentParsingFunction = ParseBogusComment;
                         } else {
-                            OnParseError("Unescaped <");
-                            sb.Append(c);
+                            OnParseError("Unescaped < in PCDATA");
+                            sb.Append('<');
                         }
                         break;
                     }
-                } else if (c == EOF_CHAR) {
-                    break;
-                } else {
-                    sb.Append(c);
                 }
-            } while (_currentParsingFunction == ParseData);
-
+            }
             if (sb.Length > 0) {
                 InitToken(XmlNodeType.Text);
                 _value = sb.ToString();
@@ -232,55 +303,87 @@ namespace Twintsam.Html
             if (PeekChars(2) == "--") {
                 EatChars(2);
                 // http://www.whatwg.org/specs/web-apps/current-work/#comment
-                StringBuilder sb = new StringBuilder();
+                InitToken(XmlNodeType.Comment);
                 int dashes = 0;
-                char c;
-                for (c = EatNextInputChar(); c != EOF_CHAR && (dashes < 2 || c != '>'); c = EatNextInputChar()) {
+                _value = PeekChars(delegate(char c)
+                {
                     if (c == '-') {
                         dashes++;
-                    } else if (dashes >= 2 && c != '>') {
-                        // at least 2 dashes not followed by '>' => reinit dashes counter
-                        dashes = 0;
                     }
-                    sb.Append(c);
+                    // using dashes < 3 here (rather than dashes < 2)
+                    // because we might have just incremented above
+                    return dashes < 3 || c != '>';
+                });
+                int length = _value.Length;
+                bool endOnEOF = (PeekChar(length) == EOF_CHAR);
+                if (!endOnEOF) {
+                    _value = _value.Substring(0, _value.Length - 2);
+                    length++; // also eat the following '>'
                 }
-                InitToken(XmlNodeType.Comment);
-                _value = sb.ToString(0, sb.Length - 2);
+                EatChars(length);
+
                 if (_value.Contains("--")) {
                     OnParseError("Comment containes double-dash");
                 } else if (_value.EndsWith("-")) {
                     OnParseError("Comment ends on a dash: --->");
                 }
-                if (c == EOF_CHAR) {
-                    OnParseError("Unexpected end of file");
+
+                if (endOnEOF) {
+                    OnParseError("Unexpected end of file in comment");
                 }
+
+                _currentParsingFunction = ParseData;
                 return true;
             } else if (String.Equals(PeekChars(7), "DOCTYPE", StringComparison.OrdinalIgnoreCase)) {
                 EatChars(7);
-                // http://www.whatwg.org/specs/web-apps/current-work/#doctype0
                 InitToken(XmlNodeType.DocumentType);
 
-                if (!Constants.IsSpaceCharacter(NextInputChar)) {
+                // http://www.whatwg.org/specs/web-apps/current-work/#doctype0
+                if (!SkipChars(Constants.IsSpaceCharacter)) {
+                    // http://www.whatwg.org/specs/web-apps/current-work/#before1
                     OnParseError("<!DOCTYPE should be followed by a space character, found " + NextInputChar);
                     _doctypeInError = true;
-                    if (NextInputChar == '>' || NextInputChar == EOF_CHAR) {
-                        return true;
-                    }
                 }
-                StringBuilder sb = new StringBuilder();
-                char c = EatNextInputChar(); ;
-                while (c != EOF_CHAR && !Constants.IsSpaceCharacter(c) && c != '>') {
-                    if ('a' <= c && c <= 'z') {
-                        c = c + 0x0020;
-                    }
-                    if (c < 'A' || 'Z' < c) {
+
+                // http://www.whatwg.org/specs/web-apps/current-work/#before1
+                if (NextInputChar == '>') {
+                    OnParseError("DOCTYPE with no name");
+                    _doctypeInError = true;
+                } else {
+                    // http://www.whatwg.org/specs/web-apps/current-work/#doctype1
+                    _name = PeekChars(delegate(char c) {
+                        return !Constants.IsSpaceCharacter(c) && c != '>';
+                    });
+                    EatChars(_name.Length);
+
+                    if (Char.IsLower(_name, 0)) {
+                        // XXX: I don't know why, but the spec says so...
                         _doctypeInError = true;
                     }
-                    sb.Append(c);
+                    _name = _name.ToUpperInvariant();
+                    if (_name == "HTML") {
+                        _doctypeInError = true;
+                    }
 
-                    c = EatNextInputChar();
+                    // http://www.whatwg.org/specs/web-apps/current-work/#after0
+                    SkipChars(Constants.IsSpaceCharacter);
+
+                    // http://www.whatwg.org/specs/web-apps/current-work/#bogus0
+                    if (SkipChars(delegate(char c) { return c != '>'; })) {
+                        OnParseError("Bogus DOCTYPE");
+                        _doctypeInError = true;
+                    }
+
+                    if (NextInputChar != EOF_CHAR) {
+                        Debug.Assert(NextInputChar == '>');
+                        EatChars(1);
+                    } else {
+                        OnParseError("Unexpected end of file in DOCTYPE");
+                        _doctypeInError = true;
+                    }
                 }
-                // TODO: after doctype name
+                _currentParsingFunction = ParseData;
+                return true;
             } else {
                 _currentParsingFunction = ParseBogusComment;
                 return false;
