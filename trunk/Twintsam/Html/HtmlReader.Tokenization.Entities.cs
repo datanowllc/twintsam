@@ -129,7 +129,7 @@ namespace Twintsam.Html
                     offset++;
                 }
                 EatChars(offset);
-                return foundChar.ToString();
+                return Char.ConvertFromUtf32(foundChar);
             }
         }
     }
