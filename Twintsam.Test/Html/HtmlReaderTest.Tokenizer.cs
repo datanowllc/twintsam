@@ -21,21 +21,21 @@ namespace Twintsam.Html
     [TestClass]
     public partial class HtmlReaderTest
     {
-        private static MethodInfo HtmlReader_ReadToken =
-            typeof(HtmlReader).GetMethod("ReadToken", BindingFlags.NonPublic);
+        private static MethodInfo HtmlReader_ParseToken =
+            typeof(HtmlReader).GetMethod("ParseToken", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__tokenType =
-            typeof(HtmlReader).GetField("_tokenType", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetField("_tokenType", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__name =
-            typeof(HtmlReader).GetField("_name", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetField("_name", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__value =
-            typeof(HtmlReader).GetField("_value", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__attributes =
-            typeof(HtmlReader).GetField("_attributes", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetField("_attributes", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__doctypeInError =
-            typeof(HtmlReader).GetField("_doctypeInError", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetField("_doctypeInError", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private static Type HtmlReader_Attribute =
-            typeof(HtmlReader).GetNestedType("Attribute", BindingFlags.NonPublic);
+            typeof(HtmlReader).GetNestedType("Attribute", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader_Attribute_name =
             HtmlReader_Attribute.GetField("name");
         private static FieldInfo HtmlReader_Attribute_value =
@@ -53,7 +53,7 @@ namespace Twintsam.Html
             HtmlReader reader = new HtmlReader(new StringReader(input));
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
-            while ((bool) HtmlReader_ReadToken.Invoke(reader, null)) {
+            while ((bool) HtmlReader_ParseToken.Invoke(reader, null)) {
                 XmlNodeType nodeType = (XmlNodeType) HtmlReader__tokenType.GetValue(reader);
                 string name = (string) HtmlReader__name.GetValue(reader);
                 string value = (string) HtmlReader__value.GetValue(reader);
