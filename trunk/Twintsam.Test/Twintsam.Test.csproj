@@ -32,7 +32,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\..\..\WINDOWS\assembly\GAC_MSIL\Microsoft.VisualStudio.QualityTools.UnitTestFramework\8.0.0.0__b03f5f7f11d50a3a\Microsoft.VisualStudio.QualityTools.UnitTestFramework.dll</HintPath>
     </Reference>
-    <Reference Include="nunit.framework, Version=2.2.9.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL" Condition=" '$(UnitTestingTool)' == 'NUnit' " />
+    <Reference Include="nunit.framework, Version=2.2.9.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
@@ -47,12 +49,55 @@
       <Name>Twintsam</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <TokenizationTestData Include="Html\Tokenization\test1.test" />
+    <TreeConstructionTestData Include="Html\TreeConstruction\tests1.dat" />
+    <TreeConstructionTestData Include="Html\TreeConstruction\tests2.dat" />
+  </ItemGroup>
+  <ItemGroup>
+    <TokenizationTestGenerator Include="Html\generate-tokenization-test.py" />
+    <TreeConstructionTestGenerator Include="Html\generate-tree-construction-test.py" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
+  -->
+  <Target Name="BeforeBuild" DependsOnTargets="GenerateTokenizationTests;GenerateTreeConstructionTests">
   </Target>
   <Target Name="AfterBuild">
   </Target>
-  -->
+  <ItemGroup>
+    <AvailableItemName Include="TokenizationTestData">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TokenizationTestGenerator">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TreeConstructionTestData">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TreeConstructionTestGenerator">
+      <Visible>false</Visible>
+    </AvailableItemName>
+  </ItemGroup>
+  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTest.Tokenization.%(Filename).cs')">
+    <CreateProperty Value="%(TokenizationTestGenerator.Identity)">
+      <Output TaskParameter="Value" PropertyName="TokenizationTestGenerator" />
+    </CreateProperty>
+    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTest.Tokenization.%(TokenizationTestData.Filename).cs&quot;" />
+    <CreateItem Include="@(TokenizationTestData->'Html\HtmlReaderTest.Tokenization.%(Filename).cs')">
+      <Output TaskParameter="Include" ItemName="Compile" />
+      <Output TaskParameter="Include" ItemName="FileWrites" />
+    </CreateItem>
+  </Target>
+  <Target Name="GenerateTreeConstructionTests" Inputs="@(TreeConstructionTestData);@(TreeConstructionTestGenerator)" Outputs="@(TreeConstructionTestData->'Html\HtmlReaderTest.TreeConstruction.%(Filename).cs')">
+    <CreateProperty Value="%(TreeConstructionTestGenerator.Identity)">
+      <Output TaskParameter="Value" PropertyName="TreeConstructionTestGenerator" />
+    </CreateProperty>
+    <Exec Command="$(TreeConstructionTestGenerator) &quot;%(TreeConstructionTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTest.TreeConstruction.%(TreeConstructionTestData.Filename).cs&quot;" />
+    <CreateItem Include="@(TreeConstructionTestData->'Html\HtmlReaderTest.TreeConstruction.%(Filename).cs')">
+      <Output TaskParameter="Include" ItemName="Compile" />
+      <Output TaskParameter="Include" ItemName="FileWrites" />
+    </CreateItem>
+  </Target>
 </Project>
