@@ -40,7 +40,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Html\HtmlReaderTest.Tokenizer.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -80,22 +81,22 @@
       <Visible>false</Visible>
     </AvailableItemName>
   </ItemGroup>
-  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTest.Tokenization.%(Filename).cs')">
+  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename).cs')">
     <CreateProperty Value="%(TokenizationTestGenerator.Identity)">
       <Output TaskParameter="Value" PropertyName="TokenizationTestGenerator" />
     </CreateProperty>
-    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTest.Tokenization.%(TokenizationTestData.Filename).cs&quot;" />
-    <CreateItem Include="@(TokenizationTestData->'Html\HtmlReaderTest.Tokenization.%(Filename).cs')">
+    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTokenizationTest.%(TokenizationTestData.Filename).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
+    <CreateItem Include="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename).cs')">
       <Output TaskParameter="Include" ItemName="Compile" />
       <Output TaskParameter="Include" ItemName="FileWrites" />
     </CreateItem>
   </Target>
-  <Target Name="GenerateTreeConstructionTests" Inputs="@(TreeConstructionTestData);@(TreeConstructionTestGenerator)" Outputs="@(TreeConstructionTestData->'Html\HtmlReaderTest.TreeConstruction.%(Filename).cs')">
+  <Target Name="GenerateTreeConstructionTests" Inputs="@(TreeConstructionTestData);@(TreeConstructionTestGenerator)" Outputs="@(TreeConstructionTestData->'Html\HtmlReaderTreeConstructionTest.%(Filename).cs')">
     <CreateProperty Value="%(TreeConstructionTestGenerator.Identity)">
       <Output TaskParameter="Value" PropertyName="TreeConstructionTestGenerator" />
     </CreateProperty>
-    <Exec Command="$(TreeConstructionTestGenerator) &quot;%(TreeConstructionTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTest.TreeConstruction.%(TreeConstructionTestData.Filename).cs&quot;" />
-    <CreateItem Include="@(TreeConstructionTestData->'Html\HtmlReaderTest.TreeConstruction.%(Filename).cs')">
+    <Exec Command="$(TreeConstructionTestGenerator) &quot;%(TreeConstructionTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTreeConstructionTest.%(TreeConstructionTestData.Filename).cs&quot; %(TreeConstructionTestData.Filename)%(TreeConstructionTestData.Extension)" />
+    <CreateItem Include="@(TreeConstructionTestData->'Html\HtmlReaderTreeConstructionTest.%(Filename).cs')">
       <Output TaskParameter="Include" ItemName="Compile" />
       <Output TaskParameter="Include" ItemName="FileWrites" />
     </CreateItem>

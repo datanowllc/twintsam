@@ -6,6 +6,8 @@ tests = simplejson.load(file(sys.argv[1]))
 
 output = codecs.open(sys.argv[2], 'w', 'utf-8')
 
+prefix = sys.argv[3].replace('.', '_')
+
 output.write("""
 #if !NUNIT
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -24,7 +26,7 @@ using System.Collections.Generic;
 
 namespace Twintsam.Html
 {
-    public partial class HtmlReaderTest
+    public partial class HtmlReaderTokenizationTest
     {
 """)
 
@@ -38,10 +40,10 @@ for test in tests['tests']:
 #else
 	[TestMethod(Description="%s")]
 #endif
-	public void Test%d()
+	public void Test_%s_%d()
 	{
 		DoTest("%s", new object[] {
-	""" % (description, description, i, test['input']))
+	""" % (description, description, prefix, i, test['input']))
 	
 	for token in test['output']:
 		if token in ('ParseError', 'AtheistParseError'):
