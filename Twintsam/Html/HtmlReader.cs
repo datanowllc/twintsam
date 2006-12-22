@@ -7,7 +7,7 @@ namespace Twintsam.Html
     {
         // TODO: public constructors
 
-        public HtmlReader(TextReader reader)
+        public HtmlReader(TextReader reader) : this()
         {
             if (reader == null) {
                 throw new ArgumentNullException("reader");
