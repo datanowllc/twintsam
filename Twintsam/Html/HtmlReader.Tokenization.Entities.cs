@@ -20,8 +20,6 @@ namespace Twintsam.Html
         {
             // NOTE: the ampersand has already been eaten
 
-            Debug.Assert(NextInputChar != EOF_CHAR);
-
             if (NextInputChar == '#') {
                 bool isHex = false;
                 int next = PeekChar(2);
@@ -39,7 +37,7 @@ namespace Twintsam.Html
                 SkipChars(delegate(char c) { return c == '0'; });
 
                 string digits = PeekChars(delegate(char c) {
-                    return ('0' <= next && next <= '9') || (isHex && ('A' <= next && next <= 'F') || ('a' <= next && next <= 'f'));
+                    return ('0' <= c && c <= '9') || (isHex && ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'));
                 }, MAX_UNICODE_CODEPOINT_DIGITS); // base-10 numeric strings are always longer than base-16 ones for the same value
 
                 int length = digits.Length;
@@ -75,7 +73,10 @@ namespace Twintsam.Html
                 }
             } else {
                 string entityName = PeekChars(HtmlEntities.LonguestEntityNameLength);
-                entityName = entityName.Substring(0, entityName.IndexOf(';'));
+                int semicolonIndex = entityName.IndexOf(';');
+                if (semicolonIndex >= 0) {
+                    entityName = entityName.Substring(0, semicolonIndex);
+                }
 
                 if (entityName.Length == 0) {
                     if (NextInputChar == EOF_CHAR) {
