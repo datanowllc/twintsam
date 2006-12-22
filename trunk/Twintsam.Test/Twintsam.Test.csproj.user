@@ -5,13 +5,22 @@
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
   </PropertyGroup>
   -->
-  
   <PropertyGroup>
     <UnitTestingTool>NUnit</UnitTestingTool>
+    <ProjectView>ProjectFiles</ProjectView>
   </PropertyGroup>
   <PropertyGroup>
     <DefineConstants>$(DefineConstants);NUNIT</DefineConstants>
-    <PreBuildEvent></PreBuildEvent>
-    <PostBuildEvent></PostBuildEvent>
+    <PreBuildEvent>
+    </PreBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <StartAction>Program</StartAction>
+    <StartProgram>D:\Program Files\NUnit-Net-2.0 2.2.8\bin\nunit-gui.exe</StartProgram>
+    <StartArguments>Twintsam.Test.dll</StartArguments>
+    <StartWorkingDirectory>
+    </StartWorkingDirectory>
   </PropertyGroup>
 </Project>

@@ -19,7 +19,7 @@ using System.Xml;
 namespace Twintsam.Html
 {
     [TestClass]
-    public partial class HtmlReaderTest
+    public partial class HtmlReaderTokenizationTest
     {
         private static MethodInfo HtmlReader_ParseToken =
             typeof(HtmlReader).GetMethod("ParseToken", BindingFlags.Instance | BindingFlags.NonPublic);
