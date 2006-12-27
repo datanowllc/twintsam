@@ -52,13 +52,10 @@ for test in tests['tests']:
 			output.write('new object[] { "DOCTYPE", "%s", %s }, ' % (token[1], token[2] and 'true' or 'false'))
 		elif token[0] == 'StartTag':
 			output.write('new object[] { "StartTag", "%s", ' % token[1])
-			if token[2]:
-				output.write('new KeyValuePair<string,string>[] { ')
-				for key, value in token[2].iteritems():
-					output.write('new KeyValuePair<string,string>("%s", "%s"), ' % (key, value))
-				output.write(' } ')
-			else:
-				output.write('null')
+			output.write('new KeyValuePair<string,string>[] { ')
+			for key, value in token[2].iteritems():
+				output.write('new KeyValuePair<string,string>("%s", "%s"), ' % (key, value))
+			output.write(' } ')
 			output.write(' }, ')
 		elif token[0] == 'EndTag':
 			output.write('new string[] { "EndTag", "%s" }, ' % token[1])
