@@ -115,7 +115,11 @@ namespace Twintsam.Html
 
                     for (int j = 0; j < expectedToken.Length; j++) {
                         if (expectedToken[j] is ICollection<KeyValuePair<string, string>>) {
+#if !NUNIT
+                            Assert.IsInstanceOfType(actualToken[j], typeof(IDictionary<string, string>));
+#else
                             Assert.IsInstanceOfType(typeof(IDictionary<string, string>), actualToken[j]);
+#endif
 
                             ICollection<KeyValuePair<string, string>> expectedDict = (ICollection<KeyValuePair<string, string>>)expectedToken[j];
                             IDictionary<string, string> actualDict = (IDictionary<string, string>)actualToken[j];
