@@ -229,11 +229,11 @@ namespace Twintsam.Html
                             sb.Append("</");
                             break;
                         default:
+                            next = NextInputChar;
                             if (('a' <= next && next <= 'z') || ('A' <= next && next <= 'Z')) {
                                 _currentParsingFunction = ParseEndTag;
                             } else {
                                 // NEW: do not consume the next character (bogus comment in PCDATA)
-                                OnParseError("Bogus comment");
                                 _currentParsingFunction = ParseBogusComment;
                             }
                             break;
@@ -249,6 +249,7 @@ namespace Twintsam.Html
                         _currentParsingFunction = ParseBogusComment;
                         break;
                     default:
+                        next = NextInputChar;
                         if (('a' <= next && next <= 'z') || ('A' <= next && next <= 'Z')) {
                             _currentParsingFunction = ParseStartTag;
                         } else {
@@ -375,7 +376,7 @@ namespace Twintsam.Html
                         }
                         StringBuilder sb = new StringBuilder();
                         do {
-                            EatChars(condition);
+                            EatChars(sb, condition);
                             if (NextInputChar == '&') {
                                 EatChars(1); // Eat AMPERSAND
                                 string entityValue = EatEntity();
@@ -404,6 +405,8 @@ namespace Twintsam.Html
         // http://www.whatwg.org/specs/web-apps/current-work/#bogus
         private bool ParseBogusComment()
         {
+            OnParseError("Bogus comment");
+
             StringBuilder sb = new StringBuilder();
             for (char c = EatNextInputChar(); c != '>' && c != EOF_CHAR; c = EatNextInputChar()) {
                 sb.Append(c);
@@ -423,12 +426,16 @@ namespace Twintsam.Html
                 int dashes = 0;
                 _value = PeekChars(delegate(char c)
                 {
-                    if (c == '-') {
-                        dashes++;
+                    if (c == '>' && dashes >= 2) {
+                        return false;
+                    } else {
+                        if (c == '-') {
+                            dashes++;
+                        } else {
+                            dashes = 0;
+                        }
+                        return true;
                     }
-                    // using dashes < 3 here (rather than dashes < 2)
-                    // because we might have just incremented above
-                    return dashes < 3 || c != '>';
                 });
                 int length = _value.Length;
                 bool endOnEOF = (PeekChar(length) == EOF_CHAR);

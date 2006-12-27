@@ -22,17 +22,17 @@ namespace Twintsam.Html
 
             if (NextInputChar == '#') {
                 bool isHex = false;
-                int next = PeekChar(2);
+                char next = PeekChar(1);
                 if (next == 'x' || next == 'X') {
                     isHex = true;
-                    next = PeekChar(3);
+                    next = PeekChar(2);
                 }
                 if (next < '0' || '9' < next) {
                     OnParseError("Unescaped &#" + (isHex ? "x" : ""));
                     return null;
                 }
                 // From this point, we know we at least have a "well-formed" numeric entity, so we can safely consume '&#x' characters
-                EatChars(isHex ? 3 : 2);
+                EatChars(isHex ? 2 : 1);
 
                 SkipChars(delegate(char c) { return c == '0'; });
 
@@ -52,11 +52,11 @@ namespace Twintsam.Html
                 if (digits.Length == 0) {
                     // given that we skipped leading zeros, this means there were only zeros
                     codepoint = REPLACEMENT_CHAR;
-                } else if (digits.Length > MAX_UNICODE_CODEPOINT_HEXDIGITS) {
-                    OnParseError("Too many hex-digits, it cannot be a valid Unicode character");
+                } else if (digits.Length > (isHex ? MAX_UNICODE_CODEPOINT_HEXDIGITS : MAX_UNICODE_CODEPOINT_DIGITS)) {
+                    OnParseError("Too many digits, it cannot be a valid Unicode character");
                     codepoint = REPLACEMENT_CHAR;
                 } else {
-                    codepoint = Int32.Parse(digits, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+                    codepoint = Int32.Parse(digits, isHex ? NumberStyles.AllowHexSpecifier : NumberStyles.None, CultureInfo.InvariantCulture);
                     if (codepoint <= 0 || codepoint > MAX_UNICODE_CODEPOINT) {
                         OnParseError("Invalid Unicode character &#" + (isHex ? "x" : "") + digits + ";");
                         codepoint = REPLACEMENT_CHAR;
