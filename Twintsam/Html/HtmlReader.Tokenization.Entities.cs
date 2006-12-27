@@ -27,7 +27,10 @@ namespace Twintsam.Html
                     isHex = true;
                     next = PeekChar(2);
                 }
-                if (next < '0' || '9' < next) {
+                Predicate<char> condition = delegate(char c) {
+                    return ('0' <= c && c <= '9') || (isHex && ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'));
+                };
+                if (!condition(next)) {
                     OnParseError("Unescaped &#" + (isHex ? "x" : ""));
                     return null;
                 }
@@ -36,9 +39,7 @@ namespace Twintsam.Html
 
                 SkipChars(delegate(char c) { return c == '0'; });
 
-                string digits = PeekChars(delegate(char c) {
-                    return ('0' <= c && c <= '9') || (isHex && ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'));
-                }, MAX_UNICODE_CODEPOINT_DIGITS); // base-10 numeric strings are always longer than base-16 ones for the same value
+                string digits = PeekChars(condition, MAX_UNICODE_CODEPOINT_DIGITS); // base-10 numeric strings are always longer than base-16 ones for the same value
 
                 int length = digits.Length;
                 if (PeekChar(length) == ';') {

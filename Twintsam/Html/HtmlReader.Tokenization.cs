@@ -282,7 +282,7 @@ namespace Twintsam.Html
             ParseTag();
             // Paragraphs just before http://www.whatwg.org/specs/web-apps/current-work/#permitted:
             // When an end tag token is emitted, the content model flag must be switched to the PCDATA state.
-            ContentModel = ContentModel.Pcdata;
+            _contentModel = ContentModel.Pcdata;
             // When an end tag token is emitted with attributes, that is a parse error
             if (_attributes.Count > 0) {
                 OnParseError(Resources.Html_ParseError_EndTagWithAttributes);
@@ -314,7 +314,6 @@ namespace Twintsam.Html
                     }
                     break;
                 case '<':
-                    EatChars(1); // Eat LESS-THAN SIGN
                     OnParseError("Illformed start tag: contains <");
                     _currentParsingFunction = ParseData;
                     break;
@@ -413,6 +412,7 @@ namespace Twintsam.Html
             }
             InitToken(XmlNodeType.Comment);
             _value = sb.ToString();
+            _currentParsingFunction = ParseData;
             return true;
         }
 
@@ -470,8 +470,11 @@ namespace Twintsam.Html
 
                 // http://www.whatwg.org/specs/web-apps/current-work/#before1
                 if (NextInputChar == '>') {
+                    EatChars(1);
                     OnParseError("DOCTYPE with no name");
                     _doctypeInError = true;
+                    // FIXME: shouldn't we (and unit-tests) rather consider 'null' equivalent to String.Empty?
+                    _name = String.Empty;
                 } else {
                     // http://www.whatwg.org/specs/web-apps/current-work/#doctype1
                     _name = PeekChars(delegate(char c) {
