@@ -32,7 +32,7 @@ namespace Twintsam.Html
 
 i = 0
 for test in tests['tests']:
-	description = test['description'].replace('"', '\"')
+	description = test['description'].replace('"', r'\"')
 	output.write("""
 #if !NUNIT
 	[TestMethod]
@@ -43,7 +43,7 @@ for test in tests['tests']:
 	public void Test_%s_%d()
 	{
 		DoTest("%s", new object[] {
-	""" % (description, description, prefix, i, test['input']))
+	""" % (description, description, prefix, i, test['input'].replace('"', r'\"')))
 	
 	tokens = list(test['output'])
 	x = 1
@@ -63,20 +63,20 @@ for test in tests['tests']:
 		if token == 'ParseError':
 			output.write('"%s", ' % token)
 		elif token[0] == 'DOCTYPE':
-			output.write('new object[] { "DOCTYPE", "%s", %s }, ' % (token[1], token[2] and 'true' or 'false'))
+			output.write('new object[] { "DOCTYPE", "%s", %s }, ' % (token[1].replace('"', r'\"'), token[2] and 'true' or 'false'))
 		elif token[0] == 'StartTag':
-			output.write('new object[] { "StartTag", "%s", ' % token[1])
+			output.write('new object[] { "StartTag", "%s", ' % token[1].replace('"', r'\"'))
 			output.write('new KeyValuePair<string,string>[] { ')
 			for key, value in token[2].iteritems():
-				output.write('new KeyValuePair<string,string>("%s", "%s"), ' % (key, value))
+				output.write('new KeyValuePair<string,string>("%s", "%s"), ' % (key.replace('"', r'\"'), value.replace('"', r'\"')))
 			output.write(' } ')
 			output.write(' }, ')
 		elif token[0] == 'EndTag':
-			output.write('new string[] { "EndTag", "%s" }, ' % token[1])
+			output.write('new string[] { "EndTag", "%s" }, ' % token[1].replace('"', r'\"'))
 		elif token[0] == 'Comment':
-			output.write('new string[] { "Comment", "%s" }, ' % token[1])
+			output.write('new string[] { "Comment", "%s" }, ' % token[1].replace('"', r'\"'))
 		elif token[0] == 'Character':
-			output.write('new string[] { "Character", "%s" }, ' % token[1])
+			output.write('new string[] { "Character", "%s" }, ' % token[1].replace('"', r'\"'))
 	
 	output.write("""
 		});
