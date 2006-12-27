@@ -45,8 +45,22 @@ for test in tests['tests']:
 		DoTest("%s", new object[] {
 	""" % (description, description, prefix, i, test['input']))
 	
-	for token in test['output']:
-		if token in ('ParseError', 'AtheistParseError'):
+	tokens = list(test['output'])
+	x = 1
+	while x < len(tokens):
+		if tokens[x][0] == 'Character' and tokens[x-1][0] == 'Character':
+			# Merge consecutive 'Character' tokens
+			tokens[x-1][1] += tokens[x][1]
+			del tokens[x]
+		elif tokens[x] == 'ParseError' and ((x == len(tokens) - 1) or ((x < len(tokens) - 1) and (tokens[x-1][0] == 'Character' and tokens[x+1][0] == 'Character'))):
+			# Reorder 'ParseError' tokens if found in between to 'Character' tokens' or as the last token
+			tokens[x] = tokens[x-1]
+			tokens[x-1] = 'ParseError'
+		else:
+			x += 1
+	
+	for token in tokens:
+		if token == 'ParseError':
 			output.write('"%s", ' % token)
 		elif token[0] == 'DOCTYPE':
 			output.write('new object[] { "DOCTYPE", "%s", %s }, ' % (token[1], token[2] and 'true' or 'false'))
