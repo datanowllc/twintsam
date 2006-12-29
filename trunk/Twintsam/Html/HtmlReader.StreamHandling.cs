@@ -147,6 +147,7 @@ namespace Twintsam.Html
             _buffer.Append(_reader.ReadToEnd());
             string chars = _buffer.ToString();
             _buffer.Length = 0;
+            _readerAtEof = true;
             return chars;
         }
 
