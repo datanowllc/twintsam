@@ -2,11 +2,23 @@ import sys
 import codecs
 import simplejson
 
+try:
+	from cStringIO import StringIO
+except:
+	from StringIO import StringIO
+
 tests = simplejson.load(file(sys.argv[1]))
 
 output = codecs.open(sys.argv[2], 'w', 'utf-8')
 
 prefix = sys.argv[3].replace('.', '_')
+
+contentModelFlags = {
+	'PCDATA': 'ContentModel.Pcdata',
+	'RCDATA': 'ContentModel.Rcdata',
+	'CDATA': 'ContentModel.Cdata',
+	'PLAINTEXT': 'ContentModel.PlainText',
+}
 
 output.write("""
 #if !NUNIT
@@ -33,17 +45,8 @@ namespace Twintsam.Html
 i = 0
 for test in tests['tests']:
 	description = test['description'].replace('"', r'\"')
-	output.write("""
-#if !NUNIT
-	[TestMethod]
-	[Description("%s")]
-#else
-	[TestMethod(Description="%s")]
-#endif
-	public void Test_%s_%d()
-	{
-		DoTest("%s", new object[] {
-	""" % (description, description, prefix, i, test['input'].replace('"', r'\"')))
+	input = test['input'].replace('"', r'\"')
+	lastStartTag = test.get('lastStartTag', '').replace('"', r'\"')
 	
 	tokens = list(test['output'])
 	x = 1
@@ -58,30 +61,44 @@ for test in tests['tests']:
 			tokens[x-1] = 'ParseError'
 		else:
 			x += 1
-	
+
+	expectedOutput = u'new object[] { '
 	for token in tokens:
 		if token == 'ParseError':
-			output.write('"%s", ' % token)
+			expectedOutput += u'"ParseError", '
 		elif token[0] == 'DOCTYPE':
-			output.write('new object[] { "DOCTYPE", "%s", %s }, ' % (token[1].replace('"', r'\"'), token[2] and 'true' or 'false'))
+			expectedOutput += u'new object[] { "DOCTYPE", "%s", %s }, ' % (token[1].replace('"', r'\"'), token[2] and 'true' or 'false')
 		elif token[0] == 'StartTag':
-			output.write('new object[] { "StartTag", "%s", ' % token[1].replace('"', r'\"'))
-			output.write('new KeyValuePair<string,string>[] { ')
+			expectedOutput += u'new object[] { "StartTag", "%s", ' % token[1].replace('"', r'\"')
+			expectedOutput += u'new KeyValuePair<string,string>[] { '
 			for key, value in token[2].iteritems():
-				output.write('new KeyValuePair<string,string>("%s", "%s"), ' % (key.replace('"', r'\"'), value.replace('"', r'\"')))
-			output.write(' } ')
-			output.write(' }, ')
+				expectedOutput += u'new KeyValuePair<string,string>("%s", "%s"), ' % (key.replace('"', r'\"'), value.replace('"', r'\"'))
+			expectedOutput += u' } '
+			expectedOutput += u' }, '
 		elif token[0] == 'EndTag':
-			output.write('new string[] { "EndTag", "%s" }, ' % token[1].replace('"', r'\"'))
+			expectedOutput += u'new string[] { "EndTag", "%s" }, ' % token[1].replace('"', r'\"')
 		elif token[0] == 'Comment':
-			output.write('new string[] { "Comment", "%s" }, ' % token[1].replace('"', r'\"'))
+			expectedOutput += u'new string[] { "Comment", "%s" }, ' % token[1].replace('"', r'\"')
 		elif token[0] == 'Character':
-			output.write('new string[] { "Character", "%s" }, ' % token[1].replace('"', r'\"'))
-	
-	output.write("""
-		});
-	}
-	""")
+			expectedOutput += u'new string[] { "Character", "%s" }, ' % token[1].replace('"', r'\"')
+	expectedOutput += u'}'
+			
+	contentModels = test.get('contentModelFlags', [test.get('contentModelFlag', 'PCDATA')])
+
+	for contentModel in contentModels:
+		output.write("""
+#if !NUNIT
+		[TestMethod]
+		[Description("%s")]
+#else
+		[TestMethod(Description="%s")]
+#endif
+		public void Test_%s_%d_%s()
+		{
+			DoTest("%s", %s, %s, "%s");
+		}
+		""" % (description, description, prefix, i, contentModel, \
+			input, expectedOutput, contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag))
 	i += 1
 
 output.write("""
