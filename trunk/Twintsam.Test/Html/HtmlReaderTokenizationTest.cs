@@ -25,6 +25,8 @@ namespace Twintsam.Html
     {
         private static MethodInfo HtmlReader_ParseToken =
             typeof(HtmlReader).GetMethod("ParseToken", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static FieldInfo HtmlReader__lastEmittedStartTagName =
+            typeof(HtmlReader).GetField("_lastEmittedStartTagName", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__tokenType =
             typeof(HtmlReader).GetField("_tokenType", BindingFlags.Instance | BindingFlags.NonPublic);
         private static FieldInfo HtmlReader__name =
@@ -52,10 +54,15 @@ namespace Twintsam.Html
             }
         }
 
-        private void DoTest(string input, IList expectedOutput)
+        private void DoTest(string input, IList expectedOutput, ContentModel contentModel, string lastStartTag)
         {
             HtmlReader reader = new HtmlReader(new StringReader(input));
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
+
+            reader.ContentModel = contentModel;
+            if (!String.IsNullOrEmpty(lastStartTag)) {
+                HtmlReader__lastEmittedStartTagName.SetValue(reader, lastStartTag);
+            }
 
             while ((bool) HtmlReader_ParseToken.Invoke(reader, null)) {
                 XmlNodeType nodeType = (XmlNodeType) HtmlReader__tokenType.GetValue(reader);
