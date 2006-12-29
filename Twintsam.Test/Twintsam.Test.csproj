@@ -36,6 +36,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Html\HtmlReaderTest.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
