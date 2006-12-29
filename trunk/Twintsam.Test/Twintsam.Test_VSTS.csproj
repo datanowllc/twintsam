@@ -38,6 +38,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Html\HtmlReaderTest.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test1.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test2.test.cs" />
