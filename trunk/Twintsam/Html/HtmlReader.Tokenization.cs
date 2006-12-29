@@ -101,9 +101,8 @@ namespace Twintsam.Html
             case ContentModel.Pcdata:
                 return ParsePcdata();
             case ContentModel.Rcdata:
-                return ParseRcdata();
             case ContentModel.Cdata:
-                return ParseCdata();
+                return ParseRcdataOrCdata();
             case ContentModel.PlainText:
             default:
                 string s = this.EatCharsToEnd();
@@ -117,44 +116,28 @@ namespace Twintsam.Html
             }
         }
 
-        private bool ParseCdata()
+        private bool ParseRcdataOrCdata()
         {
-            StringBuilder sb = new StringBuilder();
-            while (_currentParsingFunction == ParseData && !EndOfStream) {
-                // http://www.whatwg.org/specs/web-apps/current-work/#data-state
-                EatChars(sb, delegate(char c) { return c != '/'; });
-                // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
-                if (!EndOfStream && sb.Length > 0 && sb[sb.Length - 1] == '<') {
-                    // found </
-                    // http://www.whatwg.org/specs/web-apps/current-work/#close1
-                    char c = PeekChar(_lastEmittedStartTagName.Length);
-                    if (String.Equals(PeekChars(_lastEmittedStartTagName.Length), _lastEmittedStartTagName, StringComparison.InvariantCultureIgnoreCase)
-                        && (Constants.IsSpaceCharacter(c) || c == '>' || c == '/' || c == '<' || c == EOF_CHAR)) {
-                        _currentParsingFunction = ParseEndTag;
-                    } else {
-                        OnParseError("Unescaped </ in CDATA");
-                        sb.Append('/'); // LESS-THAN SIGN has already been eaten
-                    }
-                }
+            Predicate<char> condition;
+            switch (ContentModel) {
+            case ContentModel.Rcdata:
+                condition = delegate(char c) { return c != '<' && c != '&'; };
+                break;
+            case ContentModel.Cdata:
+                condition = delegate(char c) { return c != '<'; };
+                break;
+            default:
+                throw new InvalidOperationException();
             }
-            if (sb.Length > 0) {
-                InitToken(XmlNodeType.Text);
-                _value = sb.ToString();
-                return true;
-            } else {
-                return false;
-            }
-        }
 
-        private bool ParseRcdata()
-        {
             StringBuilder sb = new StringBuilder();
             while (_currentParsingFunction == ParseData && !EndOfStream) {
                 // http://www.whatwg.org/specs/web-apps/current-work/#data-state
-                EatChars(sb, delegate(char c) { return c != '<' && c != '&'; });
+                EatChars(sb, condition);
                 // http://www.whatwg.org/specs/web-apps/current-work/#tag-open
                 char next = EatNextInputChar();
                 if (next == '&') {
+                    Debug.Assert(ContentModel == ContentModel.Rcdata);
                     // http://www.whatwg.org/specs/web-apps/current-work/#entity
                     string entityValue = EatEntity();
                     if (String.IsNullOrEmpty(entityValue)) {
@@ -166,20 +149,22 @@ namespace Twintsam.Html
                     }
                 } else if (next == '<') {
                     // http://www.whatwg.org/specs/web-apps/current-work/#close1
-                    if (NextInputChar != '/') {
-                        // NEW: Unescaped < in RCDATA
-                        OnParseError("Unescaped < in RCDATA");
-                        sb.Append('<');
-                    } else {
+                    if (NextInputChar == '/') {
                         EatChars(1); // Eat SOLIDUS
                         char c = PeekChar(_lastEmittedStartTagName.Length);
                         if (String.Equals(PeekChars(_lastEmittedStartTagName.Length), _lastEmittedStartTagName, StringComparison.InvariantCultureIgnoreCase)
                             && (Constants.IsSpaceCharacter(c) || c == '>' || c == '/' || c == '<' || c == EOF_CHAR)) {
                             _currentParsingFunction = ParseEndTag;
                         } else {
-                            OnParseError("Unescaped </ in CDATA");
+                            OnParseError("Unescaped </ in CDATA or RCDATA");
                             sb.Append("</");
                         }
+                    } else {
+                        if (ContentModel == ContentModel.Rcdata) {
+                            // NEW: Unescaped < in RCDATA
+                            OnParseError("Unescaped < in RCDATA");
+                        }
+                        sb.Append('<');
                     }
                 }
             }
