@@ -233,7 +233,6 @@ namespace Twintsam.Html
                             if (('a' <= next && next <= 'z') || ('A' <= next && next <= 'Z')) {
                                 _currentParsingFunction = ParseEndTag;
                             } else {
-                                // NEW: do not consume the next character (bogus comment in PCDATA)
                                 _currentParsingFunction = ParseBogusComment;
                             }
                             break;
@@ -245,7 +244,6 @@ namespace Twintsam.Html
                         sb.Append("<>");
                         break;
                     case '?':
-                        EatChars(1); // Eat QUESTION MARK
                         _currentParsingFunction = ParseBogusComment;
                         break;
                     default:
@@ -505,6 +503,7 @@ namespace Twintsam.Html
                 _currentParsingFunction = ParseData;
                 return true;
             } else {
+                // "The next character that is consumed, if any, is the first character that will be in the comment."
                 _currentParsingFunction = ParseBogusComment;
                 return false;
             }
