@@ -28,6 +28,11 @@ namespace Twintsam.Html
     {
 """)
 
+# we use the fact that an iterator's __iter__ method
+# returns the same object (with the same "iterating state")
+# so we ensure we're working with an iteraTOR and not an iteraBLE
+tests = iter(tests)
+
 i = 0
 for line in tests:
 	if line.startswith('#data'):
