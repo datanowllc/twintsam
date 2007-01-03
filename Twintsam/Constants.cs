@@ -16,6 +16,11 @@ namespace Twintsam
             return SpaceCharacters.IndexOf(c) >= 0;
         }
 
+        public static bool IsSpace(string str)
+        {
+            return Array.TrueForAll<char>(str.ToCharArray(), IsSpaceCharacter);
+        }
+
         public static readonly string[] VoidElements = {
             "base", "link", "meta", "hr", "br", "img", "embed", "param", "area", "col", "input",
         };
@@ -45,6 +50,11 @@ namespace Twintsam
         public static bool IsVoidElement(string element)
         {
             return Is(VoidElements, element);
+        }
+
+        public static bool IsScopingElement(string element)
+        {
+            return Is(ScopingElements, element);
         }
 
         private static bool Is(string[] elements, string element)
