@@ -49,9 +49,7 @@ namespace Twintsam.Html
 
         private void reader_ParseError(object source, ParseErrorEventArgs args)
         {
-            if (actualOutput.Count == 0 || actualOutput[actualOutput.Count - 1] as string != "ParseError") {
-                actualOutput.Add("ParseError");
-            }
+            actualOutput.Add("ParseError");
         }
 
         private void DoTest(string input, IList expectedOutput, ContentModel contentModel, string lastStartTag)
@@ -91,6 +89,7 @@ namespace Twintsam.Html
                     actualOutput.Add(new string[] { "Comment", value });
                     break;
                 case XmlNodeType.Text:
+                case XmlNodeType.Whitespace:
                     actualOutput.Add(new string[] { "Character", value });
                     break;
                 default:

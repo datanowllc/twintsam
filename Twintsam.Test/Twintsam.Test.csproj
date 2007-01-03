@@ -50,6 +50,7 @@
   <ItemGroup>
     <TokenizationTestData Include="Html\Tokenization\test1.test" />
     <TokenizationTestData Include="Html\Tokenization\test2.test" />
+    <TokenizationTestData Include="Html\Tokenization\contentModelFlags.test" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests1.dat" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests2.dat" />
   </ItemGroup>

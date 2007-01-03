@@ -49,18 +49,19 @@ namespace Twintsam.Html
         /// <summary>
         /// Initialises a new token with the given type.
         /// </summary>
-        /// <param name="tokenType">The type of the token, should be on of <see cref="XmlNodeType.DocumentType"/>, <see cref="XmlNodeType.Element"/>, <see cref="XmlNodeType.EndElement"/>, <see cref="XmlNodeType.Text"/> or <see cref="XmlNodeType.Comment"/></param>
+        /// <param name="tokenType">The type of the token, should be on of <see cref="XmlNodeType.DocumentType"/>, <see cref="XmlNodeType.Element"/>, <see cref="XmlNodeType.EndElement"/>, <see cref="XmlNodeType.Text"/>, <see cref="XmlNodeType.Whitespace"/> or <see cref="XmlNodeType.Comment"/></param>
         private void InitToken(XmlNodeType tokenType)
         {
             Debug.Assert(tokenType == XmlNodeType.DocumentType
                 || tokenType == XmlNodeType.Element
                 || tokenType == XmlNodeType.EndElement
                 || tokenType == XmlNodeType.Text
+                || tokenType == XmlNodeType.Whitespace
                 || tokenType == XmlNodeType.Comment);
 
             if (_tokenType == XmlNodeType.Element) {
                 _lastEmittedStartTagName = _name;
-            } else if (tokenType != XmlNodeType.Text) {
+            } else if (tokenType != XmlNodeType.Text && tokenType == XmlNodeType.Whitespace) {
                 // _lastEmittedStartTagName is for CDATA and RCDATA,
                 // which can only contain text tokens, so clear it if
                 // a non-text token is produced.
@@ -72,6 +73,12 @@ namespace Twintsam.Html
             _value = null;
             _attributes.Clear();
             _doctypeInError = false;
+        }
+
+        private void InitTextToken(string value)
+        {
+            InitToken(Constants.IsSpace(value) ? XmlNodeType.Whitespace : XmlNodeType.Text);
+            _value = value;
         }
 
         /// <summary>
@@ -107,8 +114,7 @@ namespace Twintsam.Html
             default:
                 string s = this.EatCharsToEnd();
                 if (s.Length > 0) {
-                    InitToken(XmlNodeType.Text);
-                    _value = s;
+                    InitTextToken(s);
                     return true;
                 } else {
                     return false;
@@ -141,8 +147,6 @@ namespace Twintsam.Html
                     // http://www.whatwg.org/specs/web-apps/current-work/#entity
                     string entityValue = EatEntity();
                     if (String.IsNullOrEmpty(entityValue)) {
-                        // NEW: Unescaped & in RCDATA
-                        OnParseError("Unescaped & in RCDATA");
                         sb.Append('&');
                     } else {
                         sb.Append(entityValue);
@@ -169,8 +173,7 @@ namespace Twintsam.Html
                 }
             }
             if (sb.Length > 0) {
-                InitToken(XmlNodeType.Text);
-                _value = sb.ToString();
+                InitTextToken(sb.ToString());
                 return true;
             } else {
                 return false;
@@ -189,8 +192,6 @@ namespace Twintsam.Html
                     // http://www.whatwg.org/specs/web-apps/current-work/#entity
                     string entityValue = EatEntity();
                     if (String.IsNullOrEmpty(entityValue)) {
-                        // NEW: Unescaped & in PCDATA
-                        OnParseError("Unescaped & in PCDATA");
                         sb.Append('&');
                     } else {
                         sb.Append(entityValue);
@@ -244,8 +245,7 @@ namespace Twintsam.Html
                 }
             }
             if (sb.Length > 0) {
-                InitToken(XmlNodeType.Text);
-                _value = sb.ToString();
+                InitTextToken(sb.ToString());
                 return true;
             } else {
                 return false;
