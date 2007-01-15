@@ -42,10 +42,11 @@
     <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test1.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test2.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.test2.contentModelFlags.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.contentModelFlags.test.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests1.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests2.dat.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests3.dat.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -60,6 +61,7 @@
     <TokenizationTestData Include="Html\Tokenization\contentModelFlags.test" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests1.dat" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests2.dat" />
+    <TreeConstructionTestData Include="Html\TreeConstruction\tests3.dat" />
   </ItemGroup>
   <ItemGroup>
     <TokenizationTestGenerator Include="Html\generate-tokenization-test.py" />
