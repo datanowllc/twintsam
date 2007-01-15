@@ -53,6 +53,7 @@
     <TokenizationTestData Include="Html\Tokenization\contentModelFlags.test" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests1.dat" />
     <TreeConstructionTestData Include="Html\TreeConstruction\tests2.dat" />
+    <TreeConstructionTestData Include="Html\TreeConstruction\tests3.dat" />
   </ItemGroup>
   <ItemGroup>
     <TokenizationTestGenerator Include="Html\generate-tokenization-test.py" />
