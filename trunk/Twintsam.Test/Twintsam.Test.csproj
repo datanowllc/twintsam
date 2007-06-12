@@ -48,16 +48,17 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <TokenizationTestData Include="Html\Tokenization\test1.test" />
-    <TokenizationTestData Include="Html\Tokenization\test2.test" />
-    <TokenizationTestData Include="Html\Tokenization\contentModelFlags.test" />
-    <TreeConstructionTestData Include="Html\TreeConstruction\tests1.dat" />
-    <TreeConstructionTestData Include="Html\TreeConstruction\tests2.dat" />
-    <TreeConstructionTestData Include="Html\TreeConstruction\tests3.dat" />
+    <TokenizationTestData Include="testdata\tokenizer\test1.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test2.test" />
+    <TokenizationTestData Include="testdata\tokenizer\contentModelFlags.test" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests1.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests2.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests3.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests4.dat" />
   </ItemGroup>
   <ItemGroup>
-    <TokenizationTestGenerator Include="Html\generate-tokenization-test.py" />
-    <TreeConstructionTestGenerator Include="Html\generate-tree-construction-test.py" />
+    <TokenizationTestGenerator Include="generate-tokenization-test.py" />
+    <TreeConstructionTestGenerator Include="generate-tree-construction-test.py" />
   </ItemGroup>
   <ItemGroup>
     <AvailableItemName Include="TokenizationTestData">
