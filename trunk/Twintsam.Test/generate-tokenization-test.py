@@ -9,7 +9,7 @@ except:
 
 tests = simplejson.load(file(sys.argv[1]))
 
-output = codecs.open(sys.argv[2], 'w', 'utf-8')
+output = codecs.open(sys.argv[2], 'w', 'ascii', 'backslashreplace')
 
 prefix = sys.argv[3].replace('.', '_')
 
@@ -98,7 +98,7 @@ for test in tests['tests']:
 			DoTest("%s", %s, %s, "%s");
 		}
 		""" % (description, description, prefix, i, contentModel, \
-			input, expectedOutput, contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag))
+			input.replace('\0', '\\0'), expectedOutput, contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag))
 	i += 1
 
 output.write("""
