@@ -42,12 +42,18 @@
     <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test1.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.test2.test.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.test3.test.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.test4.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.contentModelFlags.test.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.escapeFlag.test.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests1.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests2.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests3.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests4.dat.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests4.dat.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests6.dat.cs" />
+    <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
