@@ -59,11 +59,16 @@
   <ItemGroup>
     <TokenizationTestData Include="testdata\tokenizer\test1.test" />
     <TokenizationTestData Include="testdata\tokenizer\test2.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test3.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test4.test" />
     <TokenizationTestData Include="testdata\tokenizer\contentModelFlags.test" />
+    <TokenizationTestData Include="testdata\tokenizer\escapeFlag.test" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests1.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests2.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests3.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests4.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests5.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests6.dat" />
   </ItemGroup>
   <ItemGroup>
     <TokenizationTestGenerator Include="generate-tokenization-test.py" />
