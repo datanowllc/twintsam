@@ -97,8 +97,11 @@ for test in tests['tests']:
 		{
 			DoTest("%s", %s, %s, "%s");
 		}
-		""" % (description, description, prefix, i, contentModel, \
-			input.replace('\0', '\\0'), expectedOutput, contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag))
+		""" % (description, description, prefix, i, contentModel,
+			input.replace('\0', '\\0').replace('\r', '\\r').replace('\n', '\\n'),
+			expectedOutput.replace('\0', '\\0').replace('\r', '\\r').replace('\n', '\\n'),
+			contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag)
+		)
 	i += 1
 
 output.write("""
