@@ -30,7 +30,7 @@ namespace Twintsam.Html
             }
 
             if (IsParseErrorFatal) {
-                _readState = ReadState.Error;
+                _currentReadingFunction = null;
                 throw new XmlException(args.Message, null, args.LineNumber, args.LinePosition);
             }
         }

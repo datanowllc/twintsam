@@ -29,13 +29,22 @@ namespace Twintsam.Html
 
         private void DoTest(string input, int parseErrors, string expectedOutput)
         {
+            if (Environment.NewLine != "\r\n") {
+                expectedOutput = expectedOutput.Replace("\r\n", Environment.NewLine);
+            }
+
+            if (!input.StartsWith("<!DOCTYPE HTML>", StringComparison.InvariantCultureIgnoreCase)) {
+                input = "<!DOCTYPE HTML>" + input;
+                expectedOutput = "| <!DOCTYPE HTML>" + Environment.NewLine + expectedOutput;
+            }
+
             HtmlReader reader = new HtmlReader(new StringReader(input));
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
             while (reader.Read()) {
                 actualOutput.Append("| ");
-                actualOutput.Append(' ', (reader.Depth - 1) * 2);
+                actualOutput.Append(' ', reader.Depth * 2);
 
                 switch (reader.NodeType) {
                 case XmlNodeType.DocumentType:
