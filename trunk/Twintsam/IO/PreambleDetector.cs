@@ -7,8 +7,6 @@ namespace Twintsam.IO
 {
     public static class PreambleDetector
     {
-        private const int DEFAULT_BUFFER_SIZE = 3;
-
         public static readonly Encoding[] DetectedEncodings = {
             Encoding.BigEndianUnicode,
             Encoding.Unicode,
@@ -17,10 +15,10 @@ namespace Twintsam.IO
 
         public static Encoding Detect(Stream stream)
         {
-            return Detect(stream, DetectedEncodings, DEFAULT_BUFFER_SIZE);
+            return Detect(stream, DetectedEncodings);
         }
 
-        public static Encoding Detect(Stream stream, IEnumerable<Encoding> encodings, int bufferSize)
+        public static Encoding Detect(Stream stream, IEnumerable<Encoding> encodings)
         {
             if (stream == null) {
                 throw new ArgumentNullException("stream");
