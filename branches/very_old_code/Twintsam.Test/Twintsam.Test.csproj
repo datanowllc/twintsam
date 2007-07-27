@@ -1,0 +1,113 @@
+﻿<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{0FD75CF4-AE07-42BF-B8F9-C4618139946D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Twintsam</RootNamespace>
+    <AssemblyName>Twintsam.Test</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="nunit.framework, Version=2.4.1.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <Private>True</Private>
+      <HintPath>C:\Program Files\NUnit\bin\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Html\HtmlReaderTest.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
+    <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Twintsam\Twintsam.csproj">
+      <Project>{3DBC62CE-F8FF-4EE0-AE24-04D4890977A1}</Project>
+      <Name>Twintsam</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <TokenizationTestData Include="testdata\tokenizer\test1.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test2.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test3.test" />
+    <TokenizationTestData Include="testdata\tokenizer\test4.test" />
+    <TokenizationTestData Include="testdata\tokenizer\contentModelFlags.test" />
+    <TokenizationTestData Include="testdata\tokenizer\escapeFlag.test" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests1.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests2.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests3.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests4.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests5.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests6.dat" />
+  </ItemGroup>
+  <ItemGroup>
+    <TokenizationTestGenerator Include="generate-tokenization-test.py" />
+    <TreeConstructionTestGenerator Include="generate-tree-construction-test.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvailableItemName Include="TokenizationTestData">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TokenizationTestGenerator">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TreeConstructionTestData">
+      <Visible>false</Visible>
+    </AvailableItemName>
+    <AvailableItemName Include="TreeConstructionTestGenerator">
+      <Visible>false</Visible>
+    </AvailableItemName>
+  </ItemGroup>
+  <PropertyGroup>
+    <DefineConstants>$(DefineConstants);NUNIT</DefineConstants>
+  </PropertyGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Target Name="BeforeBuild" DependsOnTargets="GenerateTokenizationTests;GenerateTreeConstructionTests">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename)%(Extension).cs')">
+    <CreateProperty Value="%(TokenizationTestGenerator.Identity)">
+      <Output TaskParameter="Value" PropertyName="TokenizationTestGenerator" />
+    </CreateProperty>
+    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTokenizationTest.%(TokenizationTestData.Filename)%(TokenizationTestData.Extension).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
+    <CreateItem Include="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename)%(Extension).cs')">
+      <Output TaskParameter="Include" ItemName="Compile" />
+      <Output TaskParameter="Include" ItemName="FileWrites" />
+    </CreateItem>
+  </Target>
+  <Target Name="GenerateTreeConstructionTests" Inputs="@(TreeConstructionTestData);@(TreeConstructionTestGenerator)" Outputs="@(TreeConstructionTestData->'Html\HtmlReaderTreeConstructionTest.%(Filename)%(Extension).cs')">
+    <CreateProperty Value="%(TreeConstructionTestGenerator.Identity)">
+      <Output TaskParameter="Value" PropertyName="TreeConstructionTestGenerator" />
+    </CreateProperty>
+    <Exec Command="$(TreeConstructionTestGenerator) &quot;%(TreeConstructionTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTreeConstructionTest.%(TreeConstructionTestData.Filename)%(TreeConstructionTestData.Extension).cs&quot; %(TreeConstructionTestData.Filename)%(TreeConstructionTestData.Extension)" />
+    <CreateItem Include="@(TreeConstructionTestData->'Html\HtmlReaderTreeConstructionTest.%(Filename)%(Extension).cs')">
+      <Output TaskParameter="Include" ItemName="Compile" />
+      <Output TaskParameter="Include" ItemName="FileWrites" />
+    </CreateItem>
+  </Target>
+</Project>
