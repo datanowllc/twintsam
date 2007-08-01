@@ -21,6 +21,7 @@ namespace Twintsam.Html
     {
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
+        [Category("HtmlReader.ctor")]
         public void ConstructorThrowsExceptionOnNullArgument()
         {
             new HtmlReader(null);

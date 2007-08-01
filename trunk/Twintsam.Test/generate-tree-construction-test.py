@@ -72,11 +72,12 @@ for line in tests:
 		
 		output.write("""
 		[TestMethod]
+		[Category("TreeConstruction.%s")]
 		public void Test_%s_%d()
 		{
 			DoTest(@"%s", %d, @"%s");
 		}
-		""" % (prefix, i, input.replace('"', '""'), parseErrors, expectedOutput.replace('"', '""')))
+		""" % (prefix, prefix, i, input.replace('"', '""'), parseErrors, expectedOutput.replace('"', '""')))
 		
 		i += 1
 

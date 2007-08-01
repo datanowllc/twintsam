@@ -87,17 +87,14 @@ for test in tests['tests']:
 
 	for contentModel in contentModels:
 		output.write("""
-#if !NUNIT
 		[TestMethod]
 		[Description("%s")]
-#else
-		[TestMethod(Description="%s")]
-#endif
+		[Category("Tokenization.%s")]
 		public void Test_%s_%d_%s()
 		{
 			DoTest("%s", %s, %s, "%s");
 		}
-		""" % (description, description, prefix, i, contentModel,
+		""" % (description, prefix, prefix, i, contentModel,
 			input.replace('\0', '\\0').replace('\r', '\\r').replace('\n', '\\n'),
 			expectedOutput.replace('\0', '\\0').replace('\r', '\\r').replace('\n', '\\n'),
 			contentModelFlags.get(contentModel, 'ContentModel.Pcdata'), lastStartTag)
