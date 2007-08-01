@@ -58,6 +58,7 @@
     <TokenizationTestData Include="testdata\tokenizer\test4.test" />
     <TokenizationTestData Include="testdata\tokenizer\contentModelFlags.test" />
     <TokenizationTestData Include="testdata\tokenizer\escapeFlag.test" />
+    <TokenizationTestData Include="testdata\tokenizer\entities.test" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests1.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests2.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests3.dat" />

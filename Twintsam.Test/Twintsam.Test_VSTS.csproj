@@ -46,14 +46,16 @@
     <Compile Include="Html\HtmlReaderTokenizationTest.test4.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.contentModelFlags.test.cs" />
     <Compile Include="Html\HtmlReaderTokenizationTest.escapeFlag.test.cs" />
+    <Compile Include="Html\HtmlReaderTokenizationTest.entities.test.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests1.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests2.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests3.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests4.dat.cs" />
-    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests4.dat.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests5.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests6.dat.cs" />
     <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
+    <Compile Include="IO\PreambleDetectorTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -69,6 +71,7 @@
     <TokenizationTestData Include="testdata\tokenizer\test4.test" />
     <TokenizationTestData Include="testdata\tokenizer\contentModelFlags.test" />
     <TokenizationTestData Include="testdata\tokenizer\escapeFlag.test" />
+    <TokenizationTestData Include="testdata\tokenizer\entities.test" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests1.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests2.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests3.dat" />
