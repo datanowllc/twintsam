@@ -89,12 +89,18 @@ namespace Twintsam.Html
                 }
 
                 int foundChar = -1;
-                while (foundChar < 0 && entityName.Length >= HtmlEntities.ShortestEntityNameLength) {
+                for (string name = entityName;
+                    name.Length >= HtmlEntities.ShortestEntityNameLength;
+                    name = name.Substring(0, name.Length - 1))
+                {
                     int c;
-                    if (HtmlEntities.TryGetChar(entityName, out c)) {
+                    if (HtmlEntities.TryGetChar(name, out c)
+                        && (PeekChar(name.Length) == ';'
+                            || HtmlEntities.IsMissingSemiColonRecoverable(name)))
+                    {
+                        entityName = name;
                         foundChar = c;
-                    } else {
-                        entityName = entityName.Substring(0, entityName.Length - 1);
+                        break;
                     }
                 }
 
