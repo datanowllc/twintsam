@@ -145,7 +145,7 @@ namespace Twintsam.Html
                 if (next == '&') {
                     Debug.Assert(ContentModel == ContentModel.Rcdata);
                     // http://www.whatwg.org/specs/web-apps/current-work/#entity
-                    string entityValue = EatEntity();
+                    string entityValue = EatEntity(false);
                     if (String.IsNullOrEmpty(entityValue)) {
                         sb.Append('&');
                     } else {
@@ -190,7 +190,7 @@ namespace Twintsam.Html
                 char next = EatNextInputChar();
                 if (next == '&') {
                     // http://www.whatwg.org/specs/web-apps/current-work/#entity
-                    string entityValue = EatEntity();
+                    string entityValue = EatEntity(false);
                     if (String.IsNullOrEmpty(entityValue)) {
                         sb.Append('&');
                     } else {
@@ -361,7 +361,7 @@ namespace Twintsam.Html
                             EatChars(sb, condition);
                             if (NextInputChar == '&') {
                                 EatChars(1); // Eat AMPERSAND
-                                string entityValue = EatEntity();
+                                string entityValue = EatEntity(true);
                                 if (String.IsNullOrEmpty(entityValue)) {
                                     sb.Append('&');
                                 } else {
