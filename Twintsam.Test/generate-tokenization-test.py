@@ -89,7 +89,9 @@ for test in tests['tests']:
 		output.write("""
 		[TestMethod]
 		[Description("%s")]
+#if NUNIT
 		[Category("Tokenization.%s")]
+#endif
 		public void Test_%s_%d_%s()
 		{
 			DoTest("%s", %s, %s, "%s");

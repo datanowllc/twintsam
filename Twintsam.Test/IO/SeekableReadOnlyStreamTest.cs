@@ -47,7 +47,7 @@ namespace Twintsam.IO
 
         private SeekableReadOnlyStream stream;
 
-        [SetUp]
+        [TestInitialize]
         public void SetUp()
         {
             Stream baseStream = new MemoryStream(TEST_BYTES);

@@ -21,7 +21,9 @@ namespace Twintsam.Html
     {
         [TestMethod]
         [ExpectedException(typeof(ArgumentNullException))]
+#if NUNIT
         [Category("HtmlReader.ctor")]
+#endif
         public void ConstructorThrowsExceptionOnNullArgument()
         {
             new HtmlReader(null);

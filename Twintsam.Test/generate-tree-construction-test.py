@@ -72,7 +72,9 @@ for line in tests:
 		
 		output.write("""
 		[TestMethod]
+#if NUNIT
 		[Category("TreeConstruction.%s")]
+#endif
 		public void Test_%s_%d()
 		{
 			DoTest(@"%s", %d, @"%s");
