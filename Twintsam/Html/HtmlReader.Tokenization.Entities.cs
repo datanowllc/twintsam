@@ -64,8 +64,15 @@ namespace Twintsam.Html
                     }
                 }
 
-                if (128 <= codepoint && codepoint <= 159) {
-                    return Windows1252Encoding.GetString(new byte[] { (byte)codepoint });
+                if (codepoint == 13)
+                {
+                    OnParseError("Incorrect CR newline entity. Replaced with LF.");
+                    codepoint = 10;
+                } else if (128 <= codepoint && codepoint <= 159) {
+                    OnParseError("Entity used with illegal number (windows-1252 reference): " + codepoint.ToString());
+                    string windows1252encoded = Windows1252Encoding.GetString(new byte[] { (byte)codepoint });
+                    int newCodepoint = Char.ConvertToUtf32(windows1252encoded, 0);
+                    codepoint = (newCodepoint == codepoint) ? REPLACEMENT_CHAR : newCodepoint;
                 }
                 try {
                     return Char.ConvertFromUtf32(codepoint);
