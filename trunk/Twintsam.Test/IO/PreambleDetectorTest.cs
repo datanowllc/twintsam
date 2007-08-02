@@ -23,7 +23,8 @@ namespace Twintsam.IO
         public void DetectedEncodingsHavePreamble()
         {
             foreach (Encoding encoding in PreambleDetector.DetectedEncodings) {
-                CollectionAssert.IsNotEmpty(encoding.GetPreamble());
+                byte[] preamble = encoding.GetPreamble();
+                Assert.IsTrue(preamble != null && preamble.Length > 0);
             }
         }
 
