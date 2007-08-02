@@ -16,7 +16,7 @@ namespace Twintsam.Html
         private const int MAX_UNICODE_CODEPOINT_DIGITS = 9;
 
         // http://www.whatwg.org/specs/web-apps/current-work/#consume
-        private string EatEntity()
+        private string EatEntity(bool inAttribute)
         {
             // NOTE: the ampersand has already been eaten
 
@@ -101,9 +101,14 @@ namespace Twintsam.Html
                     name = name.Substring(0, name.Length - 1))
                 {
                     int c;
+                    //int nextnext = PeekChar(name.Length + 1);
                     if (HtmlEntities.TryGetChar(name, out c)
                         && (PeekChar(name.Length) == ';'
-                            || HtmlEntities.IsMissingSemiColonRecoverable(name)))
+                            || (HtmlEntities.IsMissingSemiColonRecoverable(name)
+                                /*&& (!inAttribute
+                                    || ('0' <= nextnext && nextnext <= '9')
+                                    || ('A' <= nextnext && nextnext <= 'Z')
+                                    || ('a' <= nextnext && nextnext <= 'z'))*/)))
                     {
                         entityName = name;
                         foundChar = c;
@@ -121,6 +126,16 @@ namespace Twintsam.Html
                     length++;
                 } else {
                     OnParseError("Entity does not end with a semi-colon");
+                    if (inAttribute)
+                    {
+                        int nextnext = PeekChar(length + 1);
+                        if (!(('0' <= nextnext && nextnext <= '9')
+                              || ('A' <= nextnext && nextnext <= 'Z')
+                              || ('a' <= nextnext && nextnext <= 'z')))
+                        {
+                            return null;
+                        }
+                    }
                 }
                 EatChars(length);
 
