@@ -133,8 +133,8 @@ namespace Twintsam.Html
             CharsToEntityNames.Add('\u2287', "supe");
             CharsToEntityNames.Add('\u22A5', "perp");
             CharsToEntityNames.Add('\u22C5', "sdot");
-            CharsToEntityNames.Add('\u2329', "lang");
-            CharsToEntityNames.Add('\u232A', "rang");
+            CharsToEntityNames.Add('\u3008', "lang");
+            CharsToEntityNames.Add('\u3009', "rang");
 
             // Five-chars long entity names
             CharsToEntityNames.Add('\u00A1', "iexcl");
@@ -297,6 +297,7 @@ namespace Twintsam.Html
             EntityNamesToChars.Add("REG", '\u00AE');
             EntityNamesToChars.Add("QUOT", '\u0022');
             EntityNamesToChars.Add("COPY", '\u00A9');
+            EntityNamesToChars.Add("TRADE", '\u2122');
         }
 
         public static bool ContainsEntityName(string entityName)
