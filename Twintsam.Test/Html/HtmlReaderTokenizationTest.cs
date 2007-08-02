@@ -49,7 +49,7 @@ namespace Twintsam.Html
 
         private void reader_ParseError(object source, ParseErrorEventArgs args)
         {
-            actualOutput.Add("ParseError");
+            actualOutput.Add(args);
         }
 
         private void DoTest(string input, IList expectedOutput, ContentModel contentModel, string lastStartTag)
@@ -111,6 +111,10 @@ namespace Twintsam.Html
                 object expected = expectedOutput[i];
                 object actual = actualOutput[i];
 
+                if (actual is ParseErrorEventArgs)
+                {
+                    actual = "ParseError";
+                }
                 Assert.AreEqual(expected.GetType(), actual.GetType());
 
                 if (expected.GetType() != typeof(string)) {
@@ -157,7 +161,16 @@ namespace Twintsam.Html
                     Trace.Write("\"=\"");
                     Trace.Write(pair.Value);
                     Trace.Write('"');
-                } else {
+                }
+                else if (obj is ParseErrorEventArgs)
+                {
+                    ParseErrorEventArgs args = (ParseErrorEventArgs)obj;
+                    Trace.Write("[\"ParseError\", \"");
+                    Trace.Write(args.Message);
+                    Trace.Write("\"]");
+                }
+                else
+                {
                     Trace.Write('"');
                     Trace.Write(obj);
                     Trace.Write('"');
