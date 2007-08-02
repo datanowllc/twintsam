@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Collections.Specialized;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Xml;
 
 namespace Twintsam.Html
@@ -15,6 +16,7 @@ namespace Twintsam.Html
 
         private static readonly Dictionary<string, int> EntityNamesToChars = new Dictionary<string, int>(NumberOfEntities);
         private static readonly Dictionary<int, string> CharsToEntityNames = new Dictionary<int, string>(NumberOfEntities - NumberOfAliases);
+        private static readonly StringCollection EntitiesNotRecoveringMissingSemiColon = new StringCollection();
 
         [SuppressMessage("Microsoft.Performance", "CA1810:InitializeReferenceTypeStaticFieldsInline")]
         static HtmlEntities()
@@ -298,6 +300,162 @@ namespace Twintsam.Html
             EntityNamesToChars.Add("QUOT", '\u0022');
             EntityNamesToChars.Add("COPY", '\u00A9');
             EntityNamesToChars.Add("TRADE", '\u2122');
+
+            // Entities for which a semi-colon is required
+            EntitiesNotRecoveringMissingSemiColon.Add("alefsym");
+            EntitiesNotRecoveringMissingSemiColon.Add("Alpha");
+            EntitiesNotRecoveringMissingSemiColon.Add("alpha");
+            EntitiesNotRecoveringMissingSemiColon.Add("and");
+            EntitiesNotRecoveringMissingSemiColon.Add("ang");
+            EntitiesNotRecoveringMissingSemiColon.Add("apos");
+            EntitiesNotRecoveringMissingSemiColon.Add("asymp");
+            EntitiesNotRecoveringMissingSemiColon.Add("bdquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("Beta");
+            EntitiesNotRecoveringMissingSemiColon.Add("beta");
+            EntitiesNotRecoveringMissingSemiColon.Add("bull");
+            EntitiesNotRecoveringMissingSemiColon.Add("cap");
+            EntitiesNotRecoveringMissingSemiColon.Add("Chi");
+            EntitiesNotRecoveringMissingSemiColon.Add("chi");
+            EntitiesNotRecoveringMissingSemiColon.Add("circ");
+            EntitiesNotRecoveringMissingSemiColon.Add("clubs");
+            EntitiesNotRecoveringMissingSemiColon.Add("cong");
+            EntitiesNotRecoveringMissingSemiColon.Add("crarr");
+            EntitiesNotRecoveringMissingSemiColon.Add("cup");
+            EntitiesNotRecoveringMissingSemiColon.Add("dagger");
+            EntitiesNotRecoveringMissingSemiColon.Add("dagger");
+            EntitiesNotRecoveringMissingSemiColon.Add("darr");
+            EntitiesNotRecoveringMissingSemiColon.Add("darr");
+            EntitiesNotRecoveringMissingSemiColon.Add("Delta");
+            EntitiesNotRecoveringMissingSemiColon.Add("delta");
+            EntitiesNotRecoveringMissingSemiColon.Add("diams");
+            EntitiesNotRecoveringMissingSemiColon.Add("empty");
+            EntitiesNotRecoveringMissingSemiColon.Add("emsp");
+            EntitiesNotRecoveringMissingSemiColon.Add("ensp");
+            EntitiesNotRecoveringMissingSemiColon.Add("Epsilon");
+            EntitiesNotRecoveringMissingSemiColon.Add("epsilon");
+            EntitiesNotRecoveringMissingSemiColon.Add("equiv");
+            EntitiesNotRecoveringMissingSemiColon.Add("Eta");
+            EntitiesNotRecoveringMissingSemiColon.Add("eta");
+            EntitiesNotRecoveringMissingSemiColon.Add("euro");
+            EntitiesNotRecoveringMissingSemiColon.Add("exist");
+            EntitiesNotRecoveringMissingSemiColon.Add("fnof");
+            EntitiesNotRecoveringMissingSemiColon.Add("forall");
+            EntitiesNotRecoveringMissingSemiColon.Add("frasl");
+            EntitiesNotRecoveringMissingSemiColon.Add("Gamma");
+            EntitiesNotRecoveringMissingSemiColon.Add("gamma");
+            EntitiesNotRecoveringMissingSemiColon.Add("ge");
+            EntitiesNotRecoveringMissingSemiColon.Add("harr");
+            EntitiesNotRecoveringMissingSemiColon.Add("harr");
+            EntitiesNotRecoveringMissingSemiColon.Add("hearts");
+            EntitiesNotRecoveringMissingSemiColon.Add("hellip");
+            EntitiesNotRecoveringMissingSemiColon.Add("image");
+            EntitiesNotRecoveringMissingSemiColon.Add("infin");
+            EntitiesNotRecoveringMissingSemiColon.Add("int");
+            EntitiesNotRecoveringMissingSemiColon.Add("Iota");
+            EntitiesNotRecoveringMissingSemiColon.Add("iota");
+            EntitiesNotRecoveringMissingSemiColon.Add("isin");
+            EntitiesNotRecoveringMissingSemiColon.Add("Kappa");
+            EntitiesNotRecoveringMissingSemiColon.Add("kappa");
+            EntitiesNotRecoveringMissingSemiColon.Add("Lambda");
+            EntitiesNotRecoveringMissingSemiColon.Add("lambda");
+            EntitiesNotRecoveringMissingSemiColon.Add("lang");
+            EntitiesNotRecoveringMissingSemiColon.Add("larr");
+            EntitiesNotRecoveringMissingSemiColon.Add("larr");
+            EntitiesNotRecoveringMissingSemiColon.Add("lceil");
+            EntitiesNotRecoveringMissingSemiColon.Add("ldquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("le");
+            EntitiesNotRecoveringMissingSemiColon.Add("lfloor");
+            EntitiesNotRecoveringMissingSemiColon.Add("lowast");
+            EntitiesNotRecoveringMissingSemiColon.Add("loz");
+            EntitiesNotRecoveringMissingSemiColon.Add("lrm");
+            EntitiesNotRecoveringMissingSemiColon.Add("lsaquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("lsquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("mdash");
+            EntitiesNotRecoveringMissingSemiColon.Add("minus");
+            EntitiesNotRecoveringMissingSemiColon.Add("Mu");
+            EntitiesNotRecoveringMissingSemiColon.Add("mu");
+            EntitiesNotRecoveringMissingSemiColon.Add("nabla");
+            EntitiesNotRecoveringMissingSemiColon.Add("ndash");
+            EntitiesNotRecoveringMissingSemiColon.Add("ne");
+            EntitiesNotRecoveringMissingSemiColon.Add("ni");
+            EntitiesNotRecoveringMissingSemiColon.Add("notin");
+            EntitiesNotRecoveringMissingSemiColon.Add("nsub");
+            EntitiesNotRecoveringMissingSemiColon.Add("Nu");
+            EntitiesNotRecoveringMissingSemiColon.Add("nu");
+            EntitiesNotRecoveringMissingSemiColon.Add("OElig");
+            EntitiesNotRecoveringMissingSemiColon.Add("oelig");
+            EntitiesNotRecoveringMissingSemiColon.Add("oline");
+            EntitiesNotRecoveringMissingSemiColon.Add("Omega");
+            EntitiesNotRecoveringMissingSemiColon.Add("omega");
+            EntitiesNotRecoveringMissingSemiColon.Add("Omicron");
+            EntitiesNotRecoveringMissingSemiColon.Add("omicron");
+            EntitiesNotRecoveringMissingSemiColon.Add("oplus");
+            EntitiesNotRecoveringMissingSemiColon.Add("or");
+            EntitiesNotRecoveringMissingSemiColon.Add("otimes");
+            EntitiesNotRecoveringMissingSemiColon.Add("part");
+            EntitiesNotRecoveringMissingSemiColon.Add("permil");
+            EntitiesNotRecoveringMissingSemiColon.Add("perp");
+            EntitiesNotRecoveringMissingSemiColon.Add("Phi");
+            EntitiesNotRecoveringMissingSemiColon.Add("phi");
+            EntitiesNotRecoveringMissingSemiColon.Add("Pi");
+            EntitiesNotRecoveringMissingSemiColon.Add("pi");
+            EntitiesNotRecoveringMissingSemiColon.Add("piv");
+            EntitiesNotRecoveringMissingSemiColon.Add("prime");
+            EntitiesNotRecoveringMissingSemiColon.Add("prime");
+            EntitiesNotRecoveringMissingSemiColon.Add("prod");
+            EntitiesNotRecoveringMissingSemiColon.Add("prop");
+            EntitiesNotRecoveringMissingSemiColon.Add("Psi");
+            EntitiesNotRecoveringMissingSemiColon.Add("psi");
+            EntitiesNotRecoveringMissingSemiColon.Add("radic");
+            EntitiesNotRecoveringMissingSemiColon.Add("rang");
+            EntitiesNotRecoveringMissingSemiColon.Add("rarr");
+            EntitiesNotRecoveringMissingSemiColon.Add("rarr");
+            EntitiesNotRecoveringMissingSemiColon.Add("rceil");
+            EntitiesNotRecoveringMissingSemiColon.Add("rdquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("real");
+            EntitiesNotRecoveringMissingSemiColon.Add("rfloor");
+            EntitiesNotRecoveringMissingSemiColon.Add("Rho");
+            EntitiesNotRecoveringMissingSemiColon.Add("rho");
+            EntitiesNotRecoveringMissingSemiColon.Add("rlm");
+            EntitiesNotRecoveringMissingSemiColon.Add("rsaquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("rsquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("sbquo");
+            EntitiesNotRecoveringMissingSemiColon.Add("Scaron");
+            EntitiesNotRecoveringMissingSemiColon.Add("scaron");
+            EntitiesNotRecoveringMissingSemiColon.Add("sdot");
+            EntitiesNotRecoveringMissingSemiColon.Add("Sigma");
+            EntitiesNotRecoveringMissingSemiColon.Add("sigma");
+            EntitiesNotRecoveringMissingSemiColon.Add("sigmaf");
+            EntitiesNotRecoveringMissingSemiColon.Add("sim");
+            EntitiesNotRecoveringMissingSemiColon.Add("spades");
+            EntitiesNotRecoveringMissingSemiColon.Add("sub");
+            EntitiesNotRecoveringMissingSemiColon.Add("sube");
+            EntitiesNotRecoveringMissingSemiColon.Add("sum");
+            EntitiesNotRecoveringMissingSemiColon.Add("sup");
+            EntitiesNotRecoveringMissingSemiColon.Add("supe");
+            EntitiesNotRecoveringMissingSemiColon.Add("Tau");
+            EntitiesNotRecoveringMissingSemiColon.Add("tau");
+            EntitiesNotRecoveringMissingSemiColon.Add("there4");
+            EntitiesNotRecoveringMissingSemiColon.Add("Theta");
+            EntitiesNotRecoveringMissingSemiColon.Add("theta");
+            EntitiesNotRecoveringMissingSemiColon.Add("thetasym");
+            EntitiesNotRecoveringMissingSemiColon.Add("thinsp");
+            EntitiesNotRecoveringMissingSemiColon.Add("tilde");
+            EntitiesNotRecoveringMissingSemiColon.Add("trade");
+            EntitiesNotRecoveringMissingSemiColon.Add("TRADE");
+            EntitiesNotRecoveringMissingSemiColon.Add("uarr");
+            EntitiesNotRecoveringMissingSemiColon.Add("uarr");
+            EntitiesNotRecoveringMissingSemiColon.Add("upsih");
+            EntitiesNotRecoveringMissingSemiColon.Add("Upsilon");
+            EntitiesNotRecoveringMissingSemiColon.Add("upsilon");
+            EntitiesNotRecoveringMissingSemiColon.Add("weierp");
+            EntitiesNotRecoveringMissingSemiColon.Add("Xi");
+            EntitiesNotRecoveringMissingSemiColon.Add("xi");
+            EntitiesNotRecoveringMissingSemiColon.Add("Yuml");
+            EntitiesNotRecoveringMissingSemiColon.Add("Zeta");
+            EntitiesNotRecoveringMissingSemiColon.Add("zeta");
+            EntitiesNotRecoveringMissingSemiColon.Add("zwj");
+            EntitiesNotRecoveringMissingSemiColon.Add("zwnj");
         }
 
         public static bool ContainsEntityName(string entityName)
@@ -338,6 +496,11 @@ namespace Twintsam.Html
         public static string GetEntityName(int c)
         {
             return CharsToEntityNames[c];
+        }
+
+        internal static bool IsMissingSemiColonRecoverable(string entityName)
+        {
+            return ! EntitiesNotRecoveringMissingSemiColon.Contains(entityName);
         }
     }
 }
