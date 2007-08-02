@@ -111,20 +111,29 @@ namespace Twintsam.Html
                 object expected = expectedOutput[i];
                 object actual = actualOutput[i];
 
-                if (actual is ParseErrorEventArgs)
-                {
-                    actual = "ParseError";
-                }
-                Assert.AreEqual(expected.GetType(), actual.GetType());
 
-                if (expected.GetType() != typeof(string)) {
+                if (expected.GetType() == typeof(string))
+                {
+                    // ParseError
+#if !NUNIT
+                    Assert.IsInstanceOfType(actual, typeof(ParseErrorEventArgs));
+#else
+                    Assert.IsInstanceOfType(typeof(ParseErrorEventArgs), actual);
+#endif
+                }
+                else
+                {
+                    Assert.AreEqual(expected.GetType(), actual.GetType());
+
                     object[] expectedToken = (object[])expected;
                     object[] actualToken = (object[])actual;
 
                     Assert.AreEqual(expectedToken.Length, actualToken.Length);
 
-                    for (int j = 0; j < expectedToken.Length; j++) {
-                        if (expectedToken[j] is ICollection<KeyValuePair<string, string>>) {
+                    for (int j = 0; j < expectedToken.Length; j++)
+                    {
+                        if (expectedToken[j] is ICollection<KeyValuePair<string, string>>)
+                        {
 #if !NUNIT
                             Assert.IsInstanceOfType(actualToken[j], typeof(IDictionary<string, string>));
 #else
@@ -136,10 +145,13 @@ namespace Twintsam.Html
 
                             Assert.AreEqual(expectedDict.Count, actualDict.Count);
 
-                            foreach (KeyValuePair<string, string> attr in expectedDict) {
+                            foreach (KeyValuePair<string, string> attr in expectedDict)
+                            {
                                 Assert.AreEqual(attr.Value, actualDict[attr.Key]);
                             }
-                        } else {
+                        }
+                        else
+                        {
                             Assert.AreEqual(expectedToken[j], actualToken[j]);
                         }
                     }
