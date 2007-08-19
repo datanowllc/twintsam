@@ -52,6 +52,10 @@
     <Compile Include="Html\HtmlReader.Tokenization.cs" />
     <Compile Include="Html\HtmlReader.Tokenization.Entities.cs" />
     <Compile Include="Html\HtmlReader.TreeConstruction.cs" />
+    <Compile Include="Html\HtmlTextReader.cs" />
+    <Compile Include="Html\HtmlTextTokenizer.cs" />
+    <Compile Include="Html\HtmlTokenizer.cs" />
+    <Compile Include="Html\HtmlWrappingTokenizer.cs" />
     <Compile Include="Html\ParseErrorEventArgs.cs" />
     <Compile Include="IO\PreambleDetector.cs" />
     <Compile Include="IO\SeekableReadOnlyStream.cs" />
