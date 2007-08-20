@@ -28,11 +28,42 @@ namespace Twintsam.Html
             EntityData,
             TagOpen,
             CloseTagOpen,
-            // To be continued...
+            TagName,
+            BeforeAttributeName,
+            AttributeName,
+            AfterAttributeName,
+            BeforeAttributeValue,
+            AttributeValueDoubleQuoted,
+            AttributeValueSingleQuoted,
+            AttributeValueUnquoted,
+            EntityInAttribute,
+            BogusComment,
+            MarkupDeclarationOpen,
+            CommentStart,
+            CommentStartDash,
+            Comment,
+            CommentEndDash,
+            CommentEnd,
+            Doctype,
+            BeforeDoctypeName,
+            DoctypeName,
+            AfterDoctypeName,
+            BeforeDoctypePublicId,
+            DoctypePublicIdDoubleQuoted,
+            DoctypePublicIdSingleQuoted,
+            AfterDoctypePublicId,
+            BeforeDoctypeSystemId,
+            DoctypeSystemIdDoubleQuoted,
+            DoctypeSystemIdSingleQuoted,
+            AfterDoctypeSystemId,
+            BogusDoctype,
             Eof,
             ReaderClosed,
         }
 
+#if DEBUG
+        private bool _isFragmentParser;
+#endif
         private HtmlTextReader _input;
         private XmlNameTable _nameTable;
         private ContentModel _contentModel;
@@ -69,6 +100,9 @@ namespace Twintsam.Html
             }
             // TODO: check all chars in lastEmittedStartTagName are valid (first simple check: no space character)
             _lastEmittedStartTagName = lastEmittedStartTagName.ToLowerInvariant();
+#if DEBUG
+            _isFragmentParser = true;
+#endif
         }
         #endregion
 
@@ -191,10 +225,10 @@ namespace Twintsam.Html
                     ParseEntityData();
                     break;
                 case ParsingFunction.TagOpen:
-                    newToken = ParseTagOpen();
+                    ParseTagOpen();
                     break;
                 case ParsingFunction.CloseTagOpen:
-                    newToken = ParseCloseTagOpen();
+                    ParseCloseTagOpen();
                     break;
                 default:
                     throw new NotImplementedException();
@@ -355,8 +389,9 @@ namespace Twintsam.Html
             _currentParsingFunction = ParsingFunction.Data;
         }
 
-        private bool ParseTagOpen()
+        private void ParseTagOpen()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#tag-open
             if (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata) {
                 if (_input.Peek() == '/') {
                     _currentParsingFunction = ParsingFunction.CloseTagOpen;
@@ -364,15 +399,141 @@ namespace Twintsam.Html
                     PrepareTextToken("<");
                     _currentParsingFunction = ParsingFunction.Data;
                 }
-                return false;
             } else {
-                throw new NotImplementedException();
+                Debug.Assert(ContentModel != ContentModel.Pcdata);
+                int c = _input.Peek();
+                if (c == '!') {
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.MarkupDeclarationOpen;
+                } else if (c == '/') {
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.CloseTagOpen;
+                } else if (c == '!') {
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.MarkupDeclarationOpen;
+                } else if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
+                    InitToken(XmlNodeType.Element);
+                    // XXX: draft says to consume the character and initialize the token name with it; we instead let ParseTagName consume the whole tag name
+                    _currentParsingFunction = ParsingFunction.TagName;
+                } else if (c == '>') {
+                    _input.Read();
+                    OnParseError("Unescaped <>");
+                    PrepareTextToken("<>");
+                    _currentParsingFunction = ParsingFunction.Data;
+                } else if (c == '?') {
+                    _input.Read();
+                    OnParseError("Bogus comment starting with <?");
+                    _currentParsingFunction = ParsingFunction.BogusComment;
+                } else {
+                    OnParseError("Unescaped <");
+                    PrepareTextToken("<");
+                    _currentParsingFunction = ParsingFunction.Data;
+                }
             }
         }
 
-        private bool ParseCloseTagOpen()
+        private void ParseCloseTagOpen()
         {
-            throw new NotImplementedException();
+            if (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata) {
+                if (_lastEmittedStartTagName == null) {
+                    Debug.Assert(_isFragmentParser);
+                    PrepareTextToken("</");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    return;
+                }
+                _input.Mark();
+                foreach (char c1 in _lastEmittedStartTagName) {
+                    int c2 = _input.Read();
+                    if (c2 < 0 || Char.ToLowerInvariant((char) c2) != c1) {
+                        _input.ResetToMark();
+                        PrepareTextToken("</");
+                        _currentParsingFunction = ParsingFunction.Data;
+                        return;
+                    }
+                }
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                case '>':
+                case '/':
+                case -1:
+                    Debug.Assert(('A' <= _lastEmittedStartTagName[0] && _lastEmittedStartTagName[0] <= 'Z')
+                        || ('a' <= _lastEmittedStartTagName[0] && _lastEmittedStartTagName[0] <= 'z'));
+                    // XXX: We cannot be in RCDATA or CDATA content model flag without the last emitted start tag name starting with a letter.
+                    // We've already read characters matching that tag name, so the end of the Close Tag Open State algorithm is predictable.
+                    // So why bother forgetting those read characters and re-read them in the Tag Name State? Just jump to the Tag Name State.
+                    _input.UnsetMark();
+                    InitToken(XmlNodeType.Element);
+                    _name = _lastEmittedStartTagName;
+                    _currentParsingFunction = ParsingFunction.TagName;
+                    break;
+                default:
+                    _input.ResetToMark();
+                    PrepareTextToken("</");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                }
+            } else {
+                Debug.Assert(ContentModel == ContentModel.Pcdata);
+                int c = _input.Peek();
+                if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
+                    // XXX: draft says to consume the character and initialize the token name with it; we instead let ParseTagName consume the whole tag name
+                    _currentParsingFunction = ParsingFunction.TagName;
+                } else if (c == '>') {
+                    _input.Read();
+                    OnParseError("Unescaped </>, all three characters ignored.");
+                    _currentParsingFunction = ParsingFunction.Data;
+                } else if (c < 0) {
+                    OnParseError("Unexpected end of stream in end tag.");
+                    PrepareTextToken("</");
+                    _currentParsingFunction = ParsingFunction.Data;
+                } else {
+                    OnParseError("End tag name not beginning with a letter, treat as a bogus comment.");
+                    _currentParsingFunction = ParsingFunction.BogusComment;
+                }
+            }
+        }
+
+        private bool ParseTagName()
+        {
+            StringBuilder sb = new StringBuilder();
+            // XXX: _name might have been initialized in ParseCloseTagOpen
+            if (_name != null) {
+                sb.Append(_name);
+            }
+            while (true) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    return false;
+                case '>':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    return true;
+                case -1:
+                    OnParseError("Unexpected end of stream in tag name");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    return false;
+                case '/':
+                    _input.Read();
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(sb.ToString())) {
+                        OnParseError("Not a permitted slash");
+                    }
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    return false;
+                default:
+                    sb.Append((char) _input.Read());
+                    break;
+                }
+            }
         }
 
         #region 8.2.3.1 Tokenizing entities
