@@ -8,7 +8,6 @@ namespace Twintsam.Html
 {
     internal class HtmlTextReader : TextReader, IXmlLineInfo
     {
-        private const char EOF_CHAR = '\0';
         private const char REPLACEMENT_CHAR = '\uFFFD';
 
         private TextReader _reader;
@@ -19,6 +18,8 @@ namespace Twintsam.Html
 
         private int _lineNumber;
         private int _linePosition;
+        private int _markLineNumber;
+        private int _markLinePosition;
 
         public HtmlTextReader(TextReader reader)
         {
@@ -26,6 +27,22 @@ namespace Twintsam.Html
                 throw new ArgumentNullException("reader");
             }
             _reader = reader;
+        }
+
+        public virtual event EventHandler<ParseErrorEventArgs> ParseError;
+
+        protected virtual void OnParseError(string message)
+        {
+            ParseErrorEventArgs args = new ParseErrorEventArgs(message, this as IXmlLineInfo);
+
+            if (ParseError != null) {
+                ParseError(this, args);
+            }
+        }
+
+        private void OnReplacedNul()
+        {
+            OnParseError("U+0000 (NUL) replaced with U+FFFD");
         }
 
         public bool IsMarked { get { return _marked; } }
@@ -36,6 +53,8 @@ namespace Twintsam.Html
                 throw new InvalidOperationException();
             }
             _marked = true;
+            _markLineNumber = _lineNumber;
+            _markLinePosition = _linePosition;
             Debug.Assert(_buffer.Length == 0);
             Debug.Assert(_bufferPos == 0);
         }
@@ -46,6 +65,11 @@ namespace Twintsam.Html
                 throw new InvalidOperationException();
             }
             _marked = false;
+            FreeBuffer();
+        }
+
+        private void FreeBuffer()
+        {
             _buffer.Length = 0;
             _bufferPos = 0;
         }
@@ -57,6 +81,8 @@ namespace Twintsam.Html
             }
             _marked = false;
             _bufferPos = 0;
+            _lineNumber = _markLineNumber;
+            _linePosition = _markLinePosition;
         }
 
         protected override void Dispose(bool disposing)
@@ -80,6 +106,7 @@ namespace Twintsam.Html
             } else {
                 int c = _reader.Peek();
                 if (c == 0) {
+                    OnReplacedNul();
                     c = REPLACEMENT_CHAR;
                 } else if (c == '\r') {
                     _reader.Read();
@@ -99,7 +126,7 @@ namespace Twintsam.Html
             if (!_marked && _buffer.Length > _bufferPos) {
                 c = _buffer[_bufferPos++];
                 if (_buffer.Length == _bufferPos) {
-                    UnsetMark();
+                    FreeBuffer();
                 }
             } else if (_lastReadCharWasCarriageReturnInLineFeedLookAhead) {
                 _lastReadCharWasCarriageReturnInLineFeedLookAhead = false;
@@ -107,6 +134,7 @@ namespace Twintsam.Html
             } else {
                 c = _reader.Read();
                 if (c == 0) {
+                    OnReplacedNul();
                     c = REPLACEMENT_CHAR;
                 } else if (c == '\r') {
                     c = '\n';
@@ -131,27 +159,27 @@ namespace Twintsam.Html
 
         public override int Read(char[] buffer, int index, int count)
         {
-            int read = _buffer.Length - _bufferPos + 1;
-
-            if (read < count) {
+            if (_buffer.Length <= _bufferPos + count) {
                 if (_lastReadCharWasCarriageReturnInLineFeedLookAhead && count > 0) {
                     _lastReadCharWasCarriageReturnInLineFeedLookAhead = false;
                     _buffer.Append('\n');
-                    read++;
                 }
-                if (read < count) {
-                    char[] chars = new char[count - read];
+                if (_buffer.Length <= _bufferPos + count) {
+                    char[] chars = new char[count - (_buffer.Length - _bufferPos + 1)];
                     while (_buffer.Length <= _bufferPos + count) {
                         int charsToRead = Math.Min(count, count - (_buffer.Length - _bufferPos + 1));
 
                         int charsRead = _reader.Read(chars, 0, charsToRead);
-                        read += charsRead;
+                        if (charsRead > 0) {
 
-                        _buffer.Append(chars, 0, charsRead);
+                            if (chars[charsRead - 1] == '\r' && _reader.Peek() == '\n') {
+                                chars[charsRead - 1] = '\n';
+                                _reader.Read();
+                            }
 
-                        _buffer.Replace('\0', REPLACEMENT_CHAR);
-                        _buffer.Replace("\r\n", "\n");
-                        _buffer.Replace('\r', '\n');
+                            _buffer.Append(chars, 0, charsRead);
+                            _buffer.Replace("\r\n", "\n", _buffer.Length - charsRead, charsRead);
+                        }
 
                         if (charsRead < charsToRead) {
                             // At EOF
@@ -161,21 +189,31 @@ namespace Twintsam.Html
                 }
             }
 
+            _buffer.Replace('\r', '\n', _bufferPos, _buffer.Length - _bufferPos + 1);
+
+            int read = Math.Min(count, _buffer.Length - _bufferPos + 1);
             _buffer.CopyTo(_bufferPos, buffer, index, read);
 
-            Array.ForEach<char>(buffer, delegate(char c) {
+            for (int i = 0; i < read; i++)
+            {
+                char c = buffer[index + i];
                 if (c == '\n') {
                     _lineNumber++;
                     _linePosition = 0;
                 } else {
                     _linePosition++;
+                    if (c == '\0'){
+                        OnReplacedNul();
+                        buffer[index + i] = REPLACEMENT_CHAR;
+                    }
                 }
-            });
+            }
 
-            if (read < count) {
-                _bufferPos += read;
-            } else {
-                UnsetMark();
+            _buffer.Replace('\0', REPLACEMENT_CHAR, _bufferPos, _buffer.Length - _bufferPos + 1);
+
+            _bufferPos += read;
+            if (!_marked && _bufferPos >= _buffer.Length) {
+                FreeBuffer();
             }
 
             return read;
@@ -183,27 +221,27 @@ namespace Twintsam.Html
 
         public override int ReadBlock(char[] buffer, int index, int count)
         {
-            int read = _buffer.Length - _bufferPos + 1;
-
-            if (read < count) {
+            if (_buffer.Length <= _bufferPos + count) {
                 if (_lastReadCharWasCarriageReturnInLineFeedLookAhead && count > 0) {
                     _lastReadCharWasCarriageReturnInLineFeedLookAhead = false;
                     _buffer.Append('\n');
-                    read++;
                 }
-                if (read < count) {
-                    char[] chars = new char[count - read];
+                if (_buffer.Length <= _bufferPos + count) {
+                    char[] chars = new char[count - (_buffer.Length - _bufferPos + 1)];
                     while (_buffer.Length <= _bufferPos + count) {
                         int charsToRead = Math.Min(count, count - (_buffer.Length - _bufferPos + 1));
 
                         int charsRead = _reader.ReadBlock(chars, 0, charsToRead);
-                        read += charsRead;
+                        if (charsRead > 0) {
 
-                        _buffer.Append(chars, 0, charsRead);
+                            if (chars[charsRead - 1] == '\r' && _reader.Peek() == '\n') {
+                                chars[charsRead - 1] = '\n';
+                                _reader.Read();
+                            }
 
-                        _buffer.Replace('\0', REPLACEMENT_CHAR);
-                        _buffer.Replace("\r\n", "\n");
-                        _buffer.Replace('\r', '\n');
+                            _buffer.Append(chars, 0, charsRead);
+                            _buffer.Replace("\r\n", "\n", _buffer.Length - charsRead, charsRead);
+                        }
 
                         if (charsRead < charsToRead) {
                             // At EOF
@@ -213,21 +251,30 @@ namespace Twintsam.Html
                 }
             }
 
+            _buffer.Replace('\r', '\n', _bufferPos, _buffer.Length - _bufferPos + 1);
+
+            int read = Math.Min(count, _buffer.Length - _bufferPos + 1);
             _buffer.CopyTo(_bufferPos, buffer, index, read);
-            
-            Array.ForEach<char>(buffer, delegate(char c) {
+
+            for (int i = 0; i < read; i++) {
+                char c = buffer[index + i];
                 if (c == '\n') {
                     _lineNumber++;
                     _linePosition = 0;
                 } else {
                     _linePosition++;
+                    if (c == '\0') {
+                        OnReplacedNul();
+                        buffer[index + i] = REPLACEMENT_CHAR;
+                    }
                 }
-            });
+            }
 
-            if (read < count) {
-                _bufferPos += read;
-            } else {
-                UnsetMark();
+            _buffer.Replace('\0', REPLACEMENT_CHAR, _bufferPos, _buffer.Length - _bufferPos + 1);
+
+            _bufferPos += read;
+            if (!_marked && _bufferPos >= _buffer.Length) {
+                FreeBuffer();
             }
 
             return read;
@@ -241,7 +288,6 @@ namespace Twintsam.Html
         public override string ReadToEnd()
         {
             string toEnd = _reader.ReadToEnd();
-            toEnd = toEnd.Replace('\0', REPLACEMENT_CHAR);
             toEnd = toEnd.Replace("\r\n", "\n");
             toEnd = toEnd.Replace('\r', '\n');
 
@@ -251,14 +297,19 @@ namespace Twintsam.Html
                     _linePosition = 0;
                 } else {
                     _linePosition++;
+                    if (c == '\0') {
+                        OnReplacedNul();
+                    }
                 }
             }
+
+            toEnd = toEnd.Replace('\0', REPLACEMENT_CHAR);
 
             if (_marked) {
                 _buffer.Append(toEnd);
             } else if (_buffer.Length > _bufferPos) {
                 toEnd = _buffer.ToString(_bufferPos, _buffer.Length - _bufferPos) + toEnd;
-                UnsetMark();
+                FreeBuffer();
             }
 
             return toEnd;
