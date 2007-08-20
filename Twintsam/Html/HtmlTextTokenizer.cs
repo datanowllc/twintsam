@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Xml;
 using System.Text;
@@ -57,12 +58,29 @@ namespace Twintsam.Html
             if (_input == null) {
                 _input = new HtmlTextReader(input);
             }
+
+            _input.ParseError += new EventHandler<ParseErrorEventArgs>(input_ParseError);
+        }
+
+        public HtmlTextTokenizer(TextReader input, string lastEmittedStartTagName) : this(input)
+        {
+            if (String.IsNullOrEmpty(lastEmittedStartTagName)) {
+                throw new ArgumentNullException("lastEmittedStartTagName");
+            }
+            // TODO: check all chars in lastEmittedStartTagName are valid (first simple check: no space character)
+            _lastEmittedStartTagName = lastEmittedStartTagName.ToLowerInvariant();
         }
         #endregion
 
+        private void input_ParseError(object sender, ParseErrorEventArgs e)
+        {
+            OnParseError(e);
+        }
+
         public override ReadState ReadState
         {
-            get {
+            get
+            {
                 switch (_currentParsingFunction) {
                 case ParsingFunction.Initial:
                     return ReadState.Initial;
@@ -200,17 +218,17 @@ namespace Twintsam.Html
 
         public bool HasLineInfo()
         {
-            throw new NotImplementedException();
+            return _input.HasLineInfo();
         }
 
         public int LineNumber
         {
-            get { throw new NotImplementedException(); }
+            get { return _input.LineNumber; }
         }
 
         public int LinePosition
         {
-            get { throw new NotImplementedException(); }
+            get { return _input.LinePosition; }
         }
 
         #endregion
@@ -299,11 +317,11 @@ namespace Twintsam.Html
                         break;
                     case '<':
                         if ((ContentModel == ContentModel.Pcdata)
-                            || (!_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Pcdata))) {
+                            || (!_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata))) {
                             _currentParsingFunction = ParsingFunction.TagOpen;
                             return PrepareTextToken(sb.ToString());
                         } else {
-                            sb.Append((char) next);
+                            sb.Append((char)next);
                         }
                         break;
                     case '>':
@@ -317,7 +335,7 @@ namespace Twintsam.Html
                         }
                         break;
                     default:
-                        sb.Append((char) next);
+                        sb.Append((char)next);
                         break;
                     }
                 }
@@ -326,23 +344,13 @@ namespace Twintsam.Html
 
         private void ParseEntityData()
         {
-            Debug.Assert(ContentModel != ContentModel.Cdata);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#entity
-            switch (_input.Peek()) {
-            case '\t':
-            case '\n':
-            case '\v':
-            case '\f':
-            case ' ':
-            case '<':
-            case '&':
-            case -1:
-                // Not an entity. No characters are consumed, and nothing is returned. (This is not an error, either.)
-                break;
-            case '#': // Numeric (decimal or hexadecimal) entity
-                throw new NotImplementedException();
-            default: // Named entity
-                throw new NotImplementedException();
+            Debug.Assert(ContentModel != ContentModel.Cdata);
+            string character = ConsumeEntity(false);
+            if (String.IsNullOrEmpty(character)) {
+                PrepareTextToken("&");
+            } else {
+                PrepareTextToken(character);
             }
             _currentParsingFunction = ParsingFunction.Data;
         }
@@ -366,6 +374,163 @@ namespace Twintsam.Html
         {
             throw new NotImplementedException();
         }
+
+        #region 8.2.3.1 Tokenizing entities
+        private readonly Encoding Windows1252Encoding = Encoding.GetEncoding(1252);
+
+        private const string REPLACEMENT_CHAR = "\uFFFD";
+
+        private string ConsumeEntity(bool inAttributeValue)
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#consume
+            switch (_input.Peek()) {
+            case '\t':
+            case '\n':
+            case '\v':
+            case '\f':
+            case ' ':
+            case '<':
+            case '&':
+            case -1:
+                return null;
+            case '#':
+                return ConsumeNumericEntity();
+            default:
+                return ConsumeNamedEntity(inAttributeValue);
+            }
+        }
+
+        private string ConsumeNumericEntity()
+        {
+            _input.Mark();
+            _input.Read();
+            int c = _input.Peek();
+
+            bool isHex = false;
+            if (c == 'x' || c == 'X') {
+                _input.Read();
+                isHex = true;
+                c = _input.Peek();
+            }
+
+            // Without leading zeros, the longest representation for U+10FFFF is 1114111 (decimal), which is 9 chars long;
+            // so we initialize the StringBuilder with this capacity (instead of the 1024-chars default)
+            StringBuilder digits = new StringBuilder(9);
+            while (('0' <= c && c <= '9') || (isHex && ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f'))) {
+                digits.Append((char)c);
+                _input.Read();
+                c = _input.Peek();
+            }
+
+            if (digits.Length == 0) {
+                _input.ResetToMark();
+                OnParseError("Unescaped &#" + (isHex ? "x" : ""));
+                return null;
+            }
+            _input.UnsetMark();
+
+            if (c == ';') {
+                _input.Read();
+            } else {
+                OnParseError("Entity does not end with a semi-colon");
+            }
+
+            int codepoint;
+            try {
+                codepoint = Int32.Parse(digits.ToString(), isHex ? NumberStyles.AllowHexSpecifier : NumberStyles.None, CultureInfo.InvariantCulture);
+            } catch (OverflowException) {
+                OnParseError("Number too large, cannot be a Unicode code point.");
+                return REPLACEMENT_CHAR;
+            }
+
+            if (codepoint == 13) {
+                OnParseError("Incorrect CR newline entity. Replaced with LF.");
+                codepoint = 10;
+            } else if (128 <= codepoint && codepoint <= 159) {
+                OnParseError("Entity used with illegal number (windows-1252 reference): " + codepoint.ToString());
+                string windows1252encoded = Windows1252Encoding.GetString(new byte[] { (byte)codepoint });
+                int newCodepoint = Char.ConvertToUtf32(windows1252encoded, 0);
+                if (newCodepoint == codepoint) {
+                    // Char.ConvertToUtf32 does not produce U+FFFD or throw an exception for an invalid Unicode code point, it just passes it unchanged
+                    return REPLACEMENT_CHAR;
+                }
+                codepoint = newCodepoint;
+            } else if (codepoint == 0) {
+                OnParseError("Incorrect NUL entity. Replaced with U+FFFD");
+                return REPLACEMENT_CHAR;
+            }
+
+            try {
+                return Char.ConvertFromUtf32(codepoint);
+            } catch (ArgumentOutOfRangeException) {
+                OnParseError("Entity used with illegal number: " + codepoint.ToString());
+                return REPLACEMENT_CHAR;
+            }
+        }
+
+        private string ConsumeNamedEntity(bool inAttributeValue)
+        {
+            _input.Mark();
+            StringBuilder entityName = new StringBuilder(HtmlEntities.LonguestEntityNameLength);
+            while (entityName.Length <= HtmlEntities.LonguestEntityNameLength) {
+                int c = _input.Peek();
+                if (c < 0 || c == ';') {
+                    break;
+                }
+                entityName.Append((char)_input.Read());
+            }
+
+            if (entityName.Length == 0) {
+                if (_input.Peek() < 0) {
+                    OnParseError("Unexpected end of file in character entity");
+                } else {
+                    OnParseError("Empty entity name &;");
+                }
+                _input.ResetToMark();
+                return null;
+            }
+
+            int foundChar = -1;
+
+            // Just for the ParseError below:
+            string name = entityName.ToString();
+
+            int nextChar = _input.Peek();
+            if (nextChar != ';' || !HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)){
+                while (entityName.Length >= HtmlEntities.ShortestEntityNameLength){
+                    if (inAttributeValue){
+                        while ((('0' <= nextChar && nextChar <= '9')
+                                || ('A' <= nextChar && nextChar <= 'Z')
+                                || ('a' <= nextChar && nextChar <= 'z'))
+                               && entityName.Length > 0){
+                            nextChar = entityName[entityName.Length - 1];
+                            entityName.Length--;
+                        }
+                    }
+
+                    if (HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)
+                        && HtmlEntities.IsMissingSemiColonRecoverable(entityName.ToString())){
+                        OnParseError("Entity does not end with a semi-colon");
+                        break;
+                    }
+
+                    nextChar = entityName[entityName.Length - 1];
+                    entityName.Length--;
+                }
+            }
+
+            if (entityName.Length < HtmlEntities.ShortestEntityNameLength) {
+                OnParseError("Named entity not found: " + name);
+                _input.ResetToMark();
+                return null;
+            }
+
+            _input.UnsetMark();
+
+            return Char.ConvertFromUtf32(foundChar);
+        }
+        #endregion
+
         #endregion
     }
 }

@@ -23,28 +23,6 @@ namespace Twintsam.Html
     [TestClass]
     public partial class HtmlReaderTokenizationTest
     {
-        private static MethodInfo HtmlReader_ParseToken =
-            typeof(HtmlReader).GetMethod("ParseToken", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__lastEmittedStartTagName =
-            typeof(HtmlReader).GetField("_lastEmittedStartTagName", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__tokenType =
-            typeof(HtmlReader).GetField("_tokenType", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__name =
-            typeof(HtmlReader).GetField("_name", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__value =
-            typeof(HtmlReader).GetField("_value", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__attributes =
-            typeof(HtmlReader).GetField("_attributes", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader__doctypeInError =
-            typeof(HtmlReader).GetField("_doctypeInError", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        private static Type HtmlReader_Attribute =
-            typeof(HtmlReader).GetNestedType("Attribute", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static FieldInfo HtmlReader_Attribute_name =
-            HtmlReader_Attribute.GetField("name");
-        private static FieldInfo HtmlReader_Attribute_value =
-            HtmlReader_Attribute.GetField("value");
-
         private ArrayList actualOutput = new ArrayList();
 
         private void reader_ParseError(object source, ParseErrorEventArgs args)
@@ -54,108 +32,109 @@ namespace Twintsam.Html
 
         private void DoTest(string input, IList expectedOutput, ContentModel contentModel, string lastStartTag)
         {
-            HtmlReader reader = new HtmlReader(new StringReader(input));
-            reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
-
-            reader.ContentModel = contentModel;
-            if (!String.IsNullOrEmpty(lastStartTag)) {
-                HtmlReader__lastEmittedStartTagName.SetValue(reader, lastStartTag);
+            HtmlTokenizer tokenizer;
+            if (String.IsNullOrEmpty(lastStartTag)) {
+                tokenizer = new HtmlTextTokenizer(new StringReader(input));
+            } else {
+                tokenizer = new HtmlTextTokenizer(new StringReader(input), lastStartTag);
             }
+            tokenizer.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
-            while ((bool) HtmlReader_ParseToken.Invoke(reader, null)) {
-                XmlNodeType nodeType = (XmlNodeType) HtmlReader__tokenType.GetValue(reader);
-                string name = (string) HtmlReader__name.GetValue(reader);
-                string value = (string) HtmlReader__value.GetValue(reader);
-                IEnumerable attributes = (IEnumerable) HtmlReader__attributes.GetValue(reader);
-                bool doctypeInError = (bool) HtmlReader__doctypeInError.GetValue(reader);
+            tokenizer.ContentModel = contentModel;
 
-                switch (nodeType) {
-                case XmlNodeType.DocumentType:
-                    actualOutput.Add(new object[] { "DOCTYPE", name, doctypeInError });
-                    break;
-                case XmlNodeType.Element:
-                    Dictionary<string,string> attrs = new Dictionary<string,string>(StringComparer.InvariantCulture);
-                    foreach (object attr in attributes) {
-                        attrs.Add(
-                            (string)HtmlReader_Attribute_name.GetValue(attr),
-                            (string)HtmlReader_Attribute_value.GetValue(attr));
+            Trace.Write("Input: ");
+            Trace.WriteLine(input);
+            try {
+                while (tokenizer.Read()) {
+                    switch (tokenizer.TokenType) {
+                    case XmlNodeType.DocumentType:
+                        actualOutput.Add(new object[] { "DOCTYPE", tokenizer.Name, tokenizer.IsIncorrectDoctype });
+                        break;
+                    case XmlNodeType.Element:
+                        Dictionary<string, string> attrs = new Dictionary<string, string>(
+                            tokenizer.HasAttributes ? tokenizer.AttributeCount : 0,
+                            StringComparer.InvariantCulture);
+                        if (tokenizer.HasAttributes) {
+                            for (int i = 0; i < tokenizer.AttributeCount; i++) {
+                                attrs.Add(
+                                    tokenizer.GetAttributeName(i),
+                                    tokenizer.GetAttribute(i));
+                            }
+                        }
+                        actualOutput.Add(new object[] { "StartTag", tokenizer.Name, attrs });
+                        break;
+                    case XmlNodeType.EndElement:
+                        actualOutput.Add(new string[] { "EndTag", tokenizer.Name });
+                        break;
+                    case XmlNodeType.Comment:
+                        actualOutput.Add(new string[] { "Comment", tokenizer.Value });
+                        break;
+                    case XmlNodeType.Text:
+                    case XmlNodeType.Whitespace:
+                        actualOutput.Add(new string[] { "Character", tokenizer.Value });
+                        break;
+                    default:
+                        Assert.Fail("Unexpected token type: {0}", tokenizer.TokenType);
+                        break;
                     }
-                    actualOutput.Add(new object[] { "StartTag", name, attrs });
-                    break;
-                case XmlNodeType.EndElement:
-                    actualOutput.Add(new string[] { "EndTag", name });
-                    break;
-                case XmlNodeType.Comment:
-                    actualOutput.Add(new string[] { "Comment", value });
-                    break;
-                case XmlNodeType.Text:
-                case XmlNodeType.Whitespace:
-                    actualOutput.Add(new string[] { "Character", value });
-                    break;
-                default:
-                    Assert.Fail("Unexpected token type: {0}", nodeType);
-                    break;
                 }
-            }
 
-            Trace.Write("Expected output: ");
-            TraceOutput(expectedOutput);
-            Trace.WriteLine("");
-            Trace.Write("Actual output: ");
-            TraceOutput(actualOutput);
-            Trace.WriteLine("");
+                Trace.Write("Expected output: ");
+                TraceOutput(expectedOutput);
+                Trace.WriteLine("");
+                Trace.Write("Actual output: ");
+                TraceOutput(actualOutput);
+                Trace.WriteLine("");
 
-            Assert.AreEqual(expectedOutput.Count, actualOutput.Count, "Not the same number of tokens");
+                Assert.AreEqual(expectedOutput.Count, actualOutput.Count, "Not the same number of tokens");
 
-            for (int i = 0; i < expectedOutput.Count; i++) {
-                object expected = expectedOutput[i];
-                object actual = actualOutput[i];
+                for (int i = 0; i < expectedOutput.Count; i++) {
+                    object expected = expectedOutput[i];
+                    object actual = actualOutput[i];
 
 
-                if (expected.GetType() == typeof(string))
-                {
-                    // ParseError
+                    if (expected.GetType() == typeof(string)) {
+                        // ParseError
 #if !NUNIT
-                    Assert.IsInstanceOfType(actual, typeof(ParseErrorEventArgs));
+                        Assert.IsInstanceOfType(actual, typeof(ParseErrorEventArgs));
 #else
                     Assert.IsInstanceOfType(typeof(ParseErrorEventArgs), actual);
 #endif
-                }
-                else
-                {
-                    Assert.AreEqual(expected.GetType(), actual.GetType());
+                    } else {
+                        Assert.AreEqual(expected.GetType(), actual.GetType());
 
-                    object[] expectedToken = (object[])expected;
-                    object[] actualToken = (object[])actual;
+                        object[] expectedToken = (object[])expected;
+                        object[] actualToken = (object[])actual;
 
-                    Assert.AreEqual(expectedToken.Length, actualToken.Length);
+                        Assert.AreEqual(expectedToken.Length, actualToken.Length);
 
-                    for (int j = 0; j < expectedToken.Length; j++)
-                    {
-                        if (expectedToken[j] is ICollection<KeyValuePair<string, string>>)
-                        {
+                        for (int j = 0; j < expectedToken.Length; j++) {
+                            if (expectedToken[j] is ICollection<KeyValuePair<string, string>>) {
 #if !NUNIT
-                            Assert.IsInstanceOfType(actualToken[j], typeof(IDictionary<string, string>));
+                                Assert.IsInstanceOfType(actualToken[j], typeof(IDictionary<string, string>));
 #else
                             Assert.IsInstanceOfType(typeof(IDictionary<string, string>), actualToken[j]);
 #endif
 
-                            ICollection<KeyValuePair<string, string>> expectedDict = (ICollection<KeyValuePair<string, string>>)expectedToken[j];
-                            IDictionary<string, string> actualDict = (IDictionary<string, string>)actualToken[j];
+                                ICollection<KeyValuePair<string, string>> expectedDict = (ICollection<KeyValuePair<string, string>>)expectedToken[j];
+                                IDictionary<string, string> actualDict = (IDictionary<string, string>)actualToken[j];
 
-                            Assert.AreEqual(expectedDict.Count, actualDict.Count);
+                                Assert.AreEqual(expectedDict.Count, actualDict.Count);
 
-                            foreach (KeyValuePair<string, string> attr in expectedDict)
-                            {
-                                Assert.AreEqual(attr.Value, actualDict[attr.Key]);
+                                foreach (KeyValuePair<string, string> attr in expectedDict) {
+                                    Assert.AreEqual(attr.Value, actualDict[attr.Key]);
+                                }
+                            } else {
+                                Assert.AreEqual(expectedToken[j], actualToken[j]);
                             }
-                        }
-                        else
-                        {
-                            Assert.AreEqual(expectedToken[j], actualToken[j]);
                         }
                     }
                 }
+            } catch (NotImplementedException) {
+                // Amnesty for those that confess
+#if !NUNIT
+                Assert.Inconclusive("Not Implemented");
+#endif
             }
         }
 

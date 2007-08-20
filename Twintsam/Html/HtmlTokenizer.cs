@@ -13,6 +13,11 @@ namespace Twintsam.Html
         {
             return new HtmlTextTokenizer(input);
         }
+
+        public static HtmlTokenizer Create(TextReader input, string lastEmittedStartTagName)
+        {
+            return new HtmlTextTokenizer(input, lastEmittedStartTagName);
+        }
         #endregion
 
         public abstract ReadState ReadState { get; }
@@ -83,7 +88,11 @@ namespace Twintsam.Html
         protected virtual void OnParseError(string message)
         {
             ParseErrorEventArgs args = new ParseErrorEventArgs(message, this as IXmlLineInfo);
+            OnParseError(args);
+        }
 
+        protected virtual void OnParseError(ParseErrorEventArgs args)
+        {
             if (ParseError != null) {
                 ParseError(this, args);
             }
