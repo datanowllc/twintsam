@@ -400,7 +400,7 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.Data;
                 }
             } else {
-                Debug.Assert(ContentModel != ContentModel.Pcdata);
+                Debug.Assert(ContentModel == ContentModel.Pcdata);
                 int c = _input.Peek();
                 if (c == '!') {
                     _input.Read();
@@ -434,6 +434,7 @@ namespace Twintsam.Html
 
         private void ParseCloseTagOpen()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#close1
             if (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata) {
                 if (_lastEmittedStartTagName == null) {
                     Debug.Assert(_isFragmentParser);
@@ -499,6 +500,7 @@ namespace Twintsam.Html
 
         private bool ParseTagName()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#tag-name0
             StringBuilder sb = new StringBuilder();
             // XXX: _name might have been initialized in ParseCloseTagOpen
             if (_name != null) {
@@ -657,20 +659,26 @@ namespace Twintsam.Html
             string name = entityName.ToString();
 
             int nextChar = _input.Peek();
-            if (nextChar != ';' || !HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)){
-                while (entityName.Length >= HtmlEntities.ShortestEntityNameLength){
-                    if (inAttributeValue){
+            if (nextChar == ';' && HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)) {
+                _input.Read();
+            } else {
+                if (nextChar == ';') {
+                    nextChar = entityName[entityName.Length - 1];
+                    entityName.Length--;
+                }
+                while (entityName.Length >= HtmlEntities.ShortestEntityNameLength) {
+                    if (inAttributeValue) {
                         while ((('0' <= nextChar && nextChar <= '9')
                                 || ('A' <= nextChar && nextChar <= 'Z')
                                 || ('a' <= nextChar && nextChar <= 'z'))
-                               && entityName.Length > 0){
+                               && entityName.Length > 0) {
                             nextChar = entityName[entityName.Length - 1];
                             entityName.Length--;
                         }
                     }
 
                     if (HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)
-                        && HtmlEntities.IsMissingSemiColonRecoverable(entityName.ToString())){
+                        && HtmlEntities.IsMissingSemiColonRecoverable(entityName.ToString())) {
                         OnParseError("Entity does not end with a semi-colon");
                         break;
                     }
