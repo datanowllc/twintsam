@@ -41,7 +41,7 @@ namespace Twintsam.Html
             AttributeValueDoubleQuoted,
             AttributeValueSingleQuoted,
             AttributeValueUnquoted,
-            EntityInAttribute,
+            // EntityInAttributeValue: handled "inline" in the ParseAttributeXXX methods
             BogusComment,
             MarkupDeclarationOpen,
             CommentStart,
@@ -327,6 +327,16 @@ namespace Twintsam.Html
                 case ParsingFunction.BeforeAttributeValue:
                     ParseBeforeAttributeValue();
                     break;
+                case ParsingFunction.AttributeValueDoubleQuoted:
+                    ParseAttributeValueDoubleQuoted();
+                    break;
+                case ParsingFunction.AttributeValueSingleQuoted:
+                    ParseAttributeValueSingleQuoted();
+                    break;
+                case ParsingFunction.AttributeValueUnquoted:
+                    ParseAttributeValueUnquoted();
+                    break;
+                // case ParsingFunction.EntityInAttributeValue: handled "inline" in the ParseAttributeXXX methods
                 default:
                     throw new NotImplementedException();
                 }
@@ -730,6 +740,7 @@ namespace Twintsam.Html
 
         private void ParseAfterAttributeName()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after
             while (_currentParsingFunction == ParsingFunction.AfterAttributeName) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -768,6 +779,7 @@ namespace Twintsam.Html
 
         private void ParseBeforeAttributeValue()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before0
             while (_currentParsingFunction == ParsingFunction.BeforeAttributeValue) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -803,6 +815,124 @@ namespace Twintsam.Html
                     // XXX: draft says to consume the character and appdn it to the (still empty) current attribute's value; we instead let ParseAttributeValueUnquoted consume the whole attribute value
                     Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
                     _currentParsingFunction = ParsingFunction.AttributeValueUnquoted;
+                    break;
+                }
+            }
+        }
+
+        private void ParseAttributeValueDoubleQuoted()
+        {
+            Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
+            Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '"');
+
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute2
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '"':
+                    _input.Read();
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    break;
+                case '&':
+                    _input.Read();
+                    string character = ConsumeEntity(true);
+                    if (String.IsNullOrEmpty(character)) {
+                        sb.Append('&');
+                    } else {
+                        sb.Append(character);
+                    }
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in attribute value");
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    sb.Append((char)_input.Read());
+                    break;
+                }
+            }
+        }
+
+        private void ParseAttributeValueSingleQuoted()
+        {
+            Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
+            Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '\'');
+
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute3
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '\'':
+                    _input.Read();
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    break;
+                case '&':
+                    _input.Read();
+                    string character = ConsumeEntity(true);
+                    if (String.IsNullOrEmpty(character)) {
+                        sb.Append('&');
+                    } else {
+                        sb.Append(character);
+                    }
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in attribute value");
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    sb.Append((char)_input.Read());
+                    break;
+                }
+            }
+        }
+
+        private void ParseAttributeValueUnquoted()
+        {
+            Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
+            Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '"');
+
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute4
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    break;
+                case '&':
+                    _input.Read();
+                    string character = ConsumeEntity(true);
+                    if (String.IsNullOrEmpty(character)) {
+                        sb.Append('&');
+                    } else {
+                        sb.Append(character);
+                    }
+                    break;
+                case '>':
+                    _input.Read();
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in attribute value");
+                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    sb.Append((char)_input.Read());
                     break;
                 }
             }
