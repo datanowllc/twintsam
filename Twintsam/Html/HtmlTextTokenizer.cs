@@ -654,6 +654,7 @@ namespace Twintsam.Html
                     break;
                 }
             }
+            _name = sb.ToString();
         }
 
         private void ParseBeforeAttributeName()
@@ -749,6 +750,7 @@ namespace Twintsam.Html
                 case '\v':
                 case '\f':
                 case ' ':
+                    _input.Read();
                     break;
                 case '=':
                     _input.Read();
@@ -788,6 +790,7 @@ namespace Twintsam.Html
                 case '\v':
                 case '\f':
                 case ' ':
+                    _input.Read();
                     break;
                 case '"':
                     _attributes[_attributes.Count - 1].quoteChar = (char)_input.Read();
