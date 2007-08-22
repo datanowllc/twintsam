@@ -61,18 +61,31 @@ namespace Twintsam.Html
             ReaderClosed,
         }
 
+        private enum TokenState
+        {
+            Uninitialized,
+            Initialized,
+            Complete,
+        }
+
 #if DEBUG
         private bool _isFragmentParser;
 #endif
         private HtmlTextReader _input;
         private XmlNameTable _nameTable;
+
         private ContentModel _contentModel;
+
+        private TokenState _tokenState;
         private XmlNodeType _tokenType;
         private string _name;
         private string _value;
         private List<Attribute> _attributes = new List<Attribute>();
         private bool _trailingSolidus;
         private bool _incorrectDoctype;
+
+        private StringBuilder _textToken = new StringBuilder();
+        private bool _textTokenIsWhitespace;
 
         private string _lastEmittedStartTagName;
         private bool _escapeFlag;
@@ -152,51 +165,99 @@ namespace Twintsam.Html
 
         public override XmlNodeType TokenType
         {
-            get { return _tokenType; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return _textTokenIsWhitespace ? XmlNodeType.Whitespace : XmlNodeType.Text;
+                }
+                return _tokenType;
+            }
         }
 
         public override string Name
         {
-            get { return _name; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return null;
+                }
+                return _name;
+            }
         }
 
         public override bool HasTrailingSolidus
         {
-            get { return _trailingSolidus; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return false;
+                }
+                return _trailingSolidus;
+            }
         }
 
         public override bool IsIncorrectDoctype
         {
-            get { return _incorrectDoctype; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return false;
+                }
+                return _incorrectDoctype;
+            }
         }
 
         public override string Value
         {
-            get { return _value; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return _textToken.ToString();
+                }
+                return _value;
+            }
         }
 
         public override int AttributeCount
         {
-            get { return _attributes.Count; }
+            get
+            {
+                if (_textToken.Length > 0) {
+                    return 0;
+                }
+                return _attributes.Count;
+            }
         }
 
         public override string GetAttributeName(int index)
         {
+            if (_textToken.Length > 0) {
+                throw new InvalidOperationException();
+            }
             return _attributes[index].name;
         }
 
         public override char GetAttributeQuoteChar(int index)
         {
+            if (_textToken.Length > 0) {
+                throw new InvalidOperationException();
+            }
             return _attributes[index].quoteChar;
         }
 
         public override string GetAttribute(int index)
         {
+            if (_textToken.Length > 0) {
+                throw new InvalidOperationException();
+            }
             return _attributes[index].value;
         }
 
         public override string GetAttribute(string name)
         {
+            if (_textToken.Length > 0) {
+                return null;
+            }
             foreach (Attribute attribute in _attributes) {
                 if (String.Equals(attribute.name, name, StringComparison.OrdinalIgnoreCase)) {
                     return attribute.value;
@@ -207,7 +268,18 @@ namespace Twintsam.Html
 
         public override bool Read()
         {
-            bool newToken = false;
+            if (_tokenState == TokenState.Complete) {
+                if (_textToken.Length > 0) {
+                    _textToken.Length = 0;
+                    _textTokenIsWhitespace = true;
+                    return true;
+                }
+                _tokenState = TokenState.Uninitialized;
+            }
+
+            _textToken.Length = 0;
+            _textTokenIsWhitespace = true;
+
             do {
                 switch (_currentParsingFunction) {
                 case ParsingFunction.Initial:
@@ -216,10 +288,15 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case ParsingFunction.Eof:
+                    if (_textToken.Length == 0) {
+                        return false;
+                    }
+                    _tokenState = TokenState.Initialized; // HACK: to exit the while loop
+                    break;
                 case ParsingFunction.ReaderClosed:
                     return false;
                 case ParsingFunction.Data:
-                    newToken = ParseData();
+                    ParseData();
                     break;
                 case ParsingFunction.EntityData:
                     ParseEntityData();
@@ -230,13 +307,17 @@ namespace Twintsam.Html
                 case ParsingFunction.CloseTagOpen:
                     ParseCloseTagOpen();
                     break;
+                case ParsingFunction.TagName:
+                    ParseTagName();
+                    break;
                 default:
                     throw new NotImplementedException();
                 }
-            } while (!newToken);
+            } while (_tokenState == TokenState.Uninitialized
+                || (_tokenState == TokenState.Initialized && _textToken.Length == 0));
 
-            Debug.Assert(newToken);
-            if (TokenType == XmlNodeType.EndElement && HasAttributes) {
+            if (_tokenState == TokenState.Complete
+                && TokenType == XmlNodeType.EndElement && HasAttributes) {
                 _contentModel = ContentModel.Pcdata;
                 OnParseError("End tag with attributes");
             }
@@ -276,16 +357,14 @@ namespace Twintsam.Html
             Debug.Assert(newTokenType == XmlNodeType.DocumentType
                 || newTokenType == XmlNodeType.Element
                 || newTokenType == XmlNodeType.EndElement
-                || newTokenType == XmlNodeType.Text
-                || newTokenType == XmlNodeType.Whitespace
                 || newTokenType == XmlNodeType.Comment);
+            Debug.Assert(_tokenState != TokenState.Initialized);
+
+            _tokenState = TokenState.Initialized;
 
             if (_tokenType == XmlNodeType.Element) {
                 _lastEmittedStartTagName = _name;
-            } else if (newTokenType != XmlNodeType.Text && newTokenType == XmlNodeType.Whitespace) {
-                // _lastEmittedStartTagName is for CDATA and RCDATA,
-                // which can only contain text tokens, so clear it if
-                // a non-text token is produced.
+            } else {
                 _lastEmittedStartTagName = null;
             }
 
@@ -297,28 +376,36 @@ namespace Twintsam.Html
             _incorrectDoctype = false;
         }
 
-        protected bool PrepareTextToken(string value)
+        protected void EmitToken()
         {
-            if (_tokenType == XmlNodeType.Text || _tokenType == XmlNodeType.Whitespace) {
-                if (_tokenType == XmlNodeType.Whitespace && !Constants.IsSpace(value)) {
-                    _tokenType = XmlNodeType.Text;
-                }
-                _value += value;
-            } else {
-                InitToken(Constants.IsSpace(value) ? XmlNodeType.Whitespace : XmlNodeType.Text);
-                _value = value;
+            Debug.Assert(_tokenState == TokenState.Initialized);
+            _tokenState = TokenState.Complete;
+        }
+
+        protected void PrepareTextToken(string value)
+        {
+            _tokenState = TokenState.Uninitialized;
+            if (_textTokenIsWhitespace && !Constants.IsSpace(value)) {
+                _textTokenIsWhitespace = false;
             }
-            return _value.Length > 0;
+            _textToken.Append(value);
+        }
+        protected void PrepareTextToken(char value)
+        {
+            _tokenState = TokenState.Uninitialized;
+            if (_textTokenIsWhitespace && !Constants.IsSpaceCharacter(value)) {
+                _textTokenIsWhitespace = false;
+            }
+            _textToken.Append(value);
         }
 
         #region Parsing
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.htmlmultipage/section-tokenisation.html#data-state
-        private bool ParseData()
+        private void ParseData()
         {
             if (ContentModel == ContentModel.PlainText) {
                 PrepareTextToken(_input.ReadToEnd());
                 _currentParsingFunction = ParsingFunction.Eof;
-                return true;
             } else {
                 StringBuilder sb = new StringBuilder();
                 int next;
@@ -327,14 +414,15 @@ namespace Twintsam.Html
                     next = _input.Read();
                     if (next < 0) {
                         _currentParsingFunction = ParsingFunction.Eof;
-                        return PrepareTextToken(sb.ToString());
+                        PrepareTextToken(sb.ToString());
+                        return;
                     }
                     switch (next) {
                     case '&':
                         if (ContentModel == ContentModel.Pcdata || ContentModel == ContentModel.Rcdata) {
                             _currentParsingFunction = ParsingFunction.EntityData;
                             PrepareTextToken(sb.ToString());
-                            return false;
+                            return;
                         } else {
                             sb.Append('&');
                         }
@@ -353,7 +441,8 @@ namespace Twintsam.Html
                         if ((ContentModel == ContentModel.Pcdata)
                             || (!_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata))) {
                             _currentParsingFunction = ParsingFunction.TagOpen;
-                            return PrepareTextToken(sb.ToString());
+                            PrepareTextToken(sb.ToString());
+                            return;
                         } else {
                             sb.Append((char)next);
                         }
@@ -467,7 +556,7 @@ namespace Twintsam.Html
                     // We've already read characters matching that tag name, so the end of the Close Tag Open State algorithm is predictable.
                     // So why bother forgetting those read characters and re-read them in the Tag Name State? Just jump to the Tag Name State.
                     _input.UnsetMark();
-                    InitToken(XmlNodeType.Element);
+                    InitToken(XmlNodeType.EndElement);
                     _name = _lastEmittedStartTagName;
                     _currentParsingFunction = ParsingFunction.TagName;
                     break;
@@ -482,6 +571,7 @@ namespace Twintsam.Html
                 int c = _input.Peek();
                 if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
                     // XXX: draft says to consume the character and initialize the token name with it; we instead let ParseTagName consume the whole tag name
+                    InitToken(XmlNodeType.Element);
                     _currentParsingFunction = ParsingFunction.TagName;
                 } else if (c == '>') {
                     _input.Read();
@@ -498,7 +588,7 @@ namespace Twintsam.Html
             }
         }
 
-        private bool ParseTagName()
+        private void ParseTagName()
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#tag-name0
             StringBuilder sb = new StringBuilder();
@@ -506,7 +596,7 @@ namespace Twintsam.Html
             if (_name != null) {
                 sb.Append(_name);
             }
-            while (true) {
+            while (_currentParsingFunction == ParsingFunction.TagName) {
                 switch (_input.Peek()) {
                 case '\t':
                 case '\n':
@@ -515,22 +605,23 @@ namespace Twintsam.Html
                 case ' ':
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
-                    return false;
+                    break;
                 case '>':
                     _input.Read();
+                    EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
-                    return true;
+                    break;
                 case -1:
                     OnParseError("Unexpected end of stream in tag name");
                     _currentParsingFunction = ParsingFunction.Data;
-                    return false;
+                    break;
                 case '/':
                     _input.Read();
                     if (_input.Peek() != '>' || !Constants.IsVoidElement(sb.ToString())) {
                         OnParseError("Not a permitted slash");
                     }
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
-                    return false;
+                    break;
                 default:
                     sb.Append((char) _input.Read());
                     break;
