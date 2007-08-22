@@ -502,6 +502,7 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#tag-open
             if (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata) {
                 if (_input.Peek() == '/') {
+                    _input.Read();
                     _currentParsingFunction = ParsingFunction.CloseTagOpen;
                 } else {
                     PrepareTextToken("<");
@@ -863,7 +864,7 @@ namespace Twintsam.Html
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute3
             StringBuilder sb = new StringBuilder();
-            while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
+            while (_currentParsingFunction == ParsingFunction.AttributeValueSingleQuoted) {
                 switch (_input.Peek()) {
                 case '\'':
                     _input.Read();
@@ -899,7 +900,7 @@ namespace Twintsam.Html
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute4
             StringBuilder sb = new StringBuilder();
-            while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
+            while (_currentParsingFunction == ParsingFunction.AttributeValueUnquoted) {
                 switch (_input.Peek()) {
                 case '\t':
                 case '\n':
