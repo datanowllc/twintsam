@@ -407,32 +407,27 @@ namespace Twintsam.Html
                 PrepareTextToken(_input.ReadToEnd());
                 _currentParsingFunction = ParsingFunction.Eof;
             } else {
-                StringBuilder sb = new StringBuilder();
                 int next;
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#data-state
                 while (true) {
                     next = _input.Read();
                     if (next < 0) {
                         _currentParsingFunction = ParsingFunction.Eof;
-                        PrepareTextToken(sb.ToString());
                         return;
                     }
                     switch (next) {
                     case '&':
                         if (ContentModel == ContentModel.Pcdata || ContentModel == ContentModel.Rcdata) {
                             _currentParsingFunction = ParsingFunction.EntityData;
-                            PrepareTextToken(sb.ToString());
                             return;
                         } else {
-                            sb.Append('&');
+                            PrepareTextToken('&');
                         }
                         break;
                     case '-':
-                        sb.Append('-');
+                        PrepareTextToken('-');
                         if (!_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata)) {
-                            PrepareTextToken(sb.ToString());
-                            sb = new StringBuilder();
-                            if (_value.EndsWith("<!--", StringComparison.Ordinal)) {
+                            if (_textToken.Length >= 4 && _textToken.ToString(_textToken.Length - 4, 4).Equals("<!--", StringComparison.Ordinal)) {
                                 _escapeFlag = true;
                             }
                         }
@@ -441,24 +436,21 @@ namespace Twintsam.Html
                         if ((ContentModel == ContentModel.Pcdata)
                             || (!_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata))) {
                             _currentParsingFunction = ParsingFunction.TagOpen;
-                            PrepareTextToken(sb.ToString());
                             return;
                         } else {
-                            sb.Append((char)next);
+                            PrepareTextToken((char)next);
                         }
                         break;
                     case '>':
-                        sb.Append('>');
+                        PrepareTextToken('>');
                         if (_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata)) {
-                            PrepareTextToken(sb.ToString());
-                            sb = new StringBuilder();
-                            if (_value.EndsWith("-->", StringComparison.Ordinal)) {
+                            if (_textToken.Length >= 4 && _textToken.ToString(_textToken.Length - 4, 4).Equals("<!--", StringComparison.Ordinal)) {
                                 _escapeFlag = false;
                             }
                         }
                         break;
                     default:
-                        sb.Append((char)next);
+                        PrepareTextToken((char)next);
                         break;
                     }
                 }
@@ -471,7 +463,7 @@ namespace Twintsam.Html
             Debug.Assert(ContentModel != ContentModel.Cdata);
             string character = ConsumeEntity(false);
             if (String.IsNullOrEmpty(character)) {
-                PrepareTextToken("&");
+                PrepareTextToken('&');
             } else {
                 PrepareTextToken(character);
             }
