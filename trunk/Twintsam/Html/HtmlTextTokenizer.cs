@@ -10,11 +10,16 @@ namespace Twintsam.Html
 {
     public class HtmlTextTokenizer : HtmlTokenizer, IXmlLineInfo
     {
-        private struct Attribute
+        private class Attribute
         {
             public string name;
-            public string value;
-            public char quoteChar;
+            public string value = "";
+            public char quoteChar = ' ';
+
+            public Attribute(string name)
+            {
+                this.name = name;
+            }
         }
 
         /// <summary>
@@ -310,6 +315,18 @@ namespace Twintsam.Html
                 case ParsingFunction.TagName:
                     ParseTagName();
                     break;
+                case ParsingFunction.BeforeAttributeName:
+                    ParseBeforeAttributeName();
+                    break;
+                case ParsingFunction.AttributeName:
+                    ParseAttributeName();
+                    break;
+                case ParsingFunction.AfterAttributeName:
+                    ParseAfterAttributeName();
+                    break;
+                case ParsingFunction.BeforeAttributeValue:
+                    ParseBeforeAttributeValue();
+                    break;
                 default:
                     throw new NotImplementedException();
                 }
@@ -526,7 +543,10 @@ namespace Twintsam.Html
                 _input.Mark();
                 foreach (char c1 in _lastEmittedStartTagName) {
                     int c2 = _input.Read();
-                    if (c2 < 0 || Char.ToLowerInvariant((char) c2) != c1) {
+                    if ('A' <= c2 && c2 <= 'Z') {
+                        c2 += 0x0020;
+                    }
+                    if (c2 < 0 || c2 != c1) {
                         _input.ResetToMark();
                         PrepareTextToken("</");
                         _currentParsingFunction = ParsingFunction.Data;
@@ -615,7 +635,174 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 default:
-                    sb.Append((char) _input.Read());
+                    char c = (char)_input.Read();
+                    if ('A' <= c && c <= 'Z') {
+                        c += (char)0x0020;
+                    }
+                    sb.Append(c);
+                    break;
+                }
+            }
+        }
+
+        private void ParseBeforeAttributeName()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before
+            while (_currentParsingFunction == ParsingFunction.BeforeAttributeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case '/':
+                    _input.Read();
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name)) {
+                        OnParseError("Not a permitted slash");
+                    }
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream before attribute name");
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    // XXX: draft says to consume the character and initialize a new attribute's name with it; we instead let ParseAttributeName consume the whole attribute name
+                    _currentParsingFunction = ParsingFunction.AttributeName;
+                    break;
+                }
+            }
+        }
+
+        private void ParseAttributeName()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute1
+            StringBuilder sb = new StringBuilder();
+            while (_currentParsingFunction == ParsingFunction.AttributeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterAttributeName;
+                    break;
+                case '=':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeValue;
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case '/':
+                    _input.Read();
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(sb.ToString())) {
+                        OnParseError("Not a permitted slash");
+                    }
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in attribute name");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    char c = (char)_input.Read();
+                    if ('A' <= c && c <= 'Z') {
+                        c += (char)0x0020;
+                    }
+                    sb.Append(c);
+                    break;
+                }
+            }
+
+            _attributes.Add(new Attribute(sb.ToString()));
+        }
+
+        private void ParseAfterAttributeName()
+        {
+            while (_currentParsingFunction == ParsingFunction.AfterAttributeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    break;
+                case '=':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeValue;
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case '/':
+                    _input.Read();
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name)) {
+                        OnParseError("Not a permitted slash");
+                    }
+                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream after attribute name");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    // XXX: draft says to consume the character and initialize a new attribute's name with it; we instead let ParseAttributeName consume the whole attribute name
+                    _currentParsingFunction = ParsingFunction.AttributeName;
+                    break;
+                }
+            }
+        }
+
+        private void ParseBeforeAttributeValue()
+        {
+            while (_currentParsingFunction == ParsingFunction.BeforeAttributeValue) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    break;
+                case '"':
+                    _attributes[_attributes.Count - 1].quoteChar = (char)_input.Read();
+                    _currentParsingFunction = ParsingFunction.AttributeValueDoubleQuoted;
+                    break;
+                case '&':
+                    Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
+                    _currentParsingFunction = ParsingFunction.AttributeValueUnquoted;
+                    break;
+                case '\'':
+                    _attributes[_attributes.Count - 1].quoteChar = (char)_input.Read();
+                    _currentParsingFunction = ParsingFunction.AttributeValueSingleQuoted;
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream before attribute value");
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    // TODO: move the following assertion at the beginning of each three ParseAttributeValueXXX method
+                    Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
+                    // XXX: draft says to consume the character and appdn it to the (still empty) current attribute's value; we instead let ParseAttributeValueUnquoted consume the whole attribute value
+                    Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
+                    _currentParsingFunction = ParsingFunction.AttributeValueUnquoted;
                     break;
                 }
             }
