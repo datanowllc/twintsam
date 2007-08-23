@@ -529,10 +529,21 @@ namespace Twintsam.Html
         }
 
         #region Parsing
-        // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.htmlmultipage/section-tokenisation.html#data-state
+        private void CheckPermittedSlash()
+        {
+            if (_input.Peek() != '>'){
+                OnParseError("Not a permitted slash: slash not at end of tag");
+            } else if (_tokenType != XmlNodeType.Element) {
+                OnParseError("Not a permitted slash: slash at end of tag but not a start tag");
+            } else if (!Constants.IsVoidElement(_buffer.ToString())) {
+                OnParseError("Not a permitted slash: slash at end of start tag but not a void element");
+            }
+        }
+
         private void ParseData()
         {
             if (ContentModel == ContentModel.PlainText) {
+                // XXX: Optimization over the spec
                 PrepareTextToken(_input.ReadToEnd());
                 _currentParsingFunction = ParsingFunction.Eof;
             } else {
@@ -736,9 +747,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_buffer.ToString())) {
-                        OnParseError("Not a permitted slash");
-                    }
+                    CheckPermittedSlash();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 default:
@@ -773,9 +782,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name)) {
-                        OnParseError("Not a permitted slash");
-                    }
+                    CheckPermittedSlash();
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream before attribute name");
@@ -816,9 +823,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name.ToString())) {
-                        OnParseError("Not a permitted slash");
-                    }
+                    CheckPermittedSlash();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case -1:
@@ -872,9 +877,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name)) {
-                        OnParseError("Not a permitted slash");
-                    }
+                    CheckPermittedSlash();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case -1:
