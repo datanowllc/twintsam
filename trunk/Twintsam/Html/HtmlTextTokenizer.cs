@@ -337,6 +337,12 @@ namespace Twintsam.Html
                     ParseAttributeValueUnquoted();
                     break;
                 // case ParsingFunction.EntityInAttributeValue: handled "inline" in the ParseAttributeXXX methods
+                case ParsingFunction.BogusComment:
+                    ParseBogusComment();
+                    break;
+                case ParsingFunction.MarkupDeclarationOpen:
+                    ParseMarkupDeclarationOpen();
+                    break;
                 default:
                     throw new NotImplementedException();
                 }
@@ -899,7 +905,7 @@ namespace Twintsam.Html
         private void ParseAttributeValueUnquoted()
         {
             Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
-            Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '"');
+            Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute4
             StringBuilder sb = new StringBuilder();
@@ -939,6 +945,62 @@ namespace Twintsam.Html
                     sb.Append((char)_input.Read());
                     break;
                 }
+            }
+        }
+
+        private void ParseBogusComment()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#bogus
+            Debug.Assert(ContentModel == ContentModel.Pcdata);
+
+            InitToken(XmlNodeType.Comment);
+            StringBuilder sb = new StringBuilder();
+            for (int c = _input.Peek(); c >= 0 && c != '>'; c = _input.Peek()) {
+                sb.Append((char)_input.Read());
+            }
+            _value = sb.ToString();
+            if (_input.Peek() == '>') {
+                _input.Read();
+            }
+            EmitToken();
+            _currentParsingFunction = ParsingFunction.Data;
+        }
+
+        private void ParseMarkupDeclarationOpen()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#markup
+            Debug.Assert(ContentModel == ContentModel.Pcdata);
+
+            _input.Mark();
+            switch (_input.Read()) {
+            case '-':
+                if (_input.Read() == '-') {
+                    _input.UnsetMark();
+                    InitToken(XmlNodeType.Comment);
+                    _currentParsingFunction = ParsingFunction.CommentStart;
+                    return;
+                } else {
+                    goto default;
+                }
+            case 'D':
+            case 'd':
+                foreach (char c1 in "OCTYPE") {
+                    int c2 = _input.Read();
+                    if ('A' <= c2 && c2 <= 'Z') {
+                        c2 += (char)0x0020;
+                    }
+                    if (c2 < 0 || c1 != c2) {
+                        goto default;
+                    }
+                }
+                _input.UnsetMark();
+                _currentParsingFunction = ParsingFunction.Doctype;
+                break;
+            default:
+                _input.ResetToMark();
+                OnParseError("Bogus comment");
+                _currentParsingFunction = ParsingFunction.BogusComment;
+                break;
             }
         }
 
