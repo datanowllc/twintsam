@@ -48,7 +48,7 @@ namespace Twintsam.Html
                 while (tokenizer.Read()) {
                     switch (tokenizer.TokenType) {
                     case XmlNodeType.DocumentType:
-                        actualOutput.Add(new object[] { "DOCTYPE", tokenizer.Name, tokenizer.IsIncorrectDoctype });
+                        actualOutput.Add(new object[] { "DOCTYPE", tokenizer.Name, tokenizer.GetAttribute("PUBLIC"), tokenizer.GetAttribute("SYSTEM"), !tokenizer.IsIncorrectDoctype });
                         break;
                     case XmlNodeType.Element:
                         Dictionary<string, string> attrs = new Dictionary<string, string>(
@@ -161,7 +161,9 @@ namespace Twintsam.Html
         {
             Trace.Write("{ ");
             foreach (object obj in collection) {
-                if (obj is ICollection) {
+                if (obj == null) {
+                    Trace.Write("null");
+                } else if (obj is ICollection) {
                     TraceOutput((ICollection)obj);
                 } else if (obj is KeyValuePair<string,string>) {
                     KeyValuePair<string, string> pair = (KeyValuePair<string, string>)obj;
@@ -175,10 +177,13 @@ namespace Twintsam.Html
                     Trace.Write("[\"ParseError\", ");
                     TraceString(args.Message);
                     Trace.Write("]");
-                }
-                else
+                } else if (obj.GetType() == typeof(string))
                 {
-                    TraceString(obj == null ? "" : obj.ToString());
+                    TraceString((string)obj);
+                } else if (obj.GetType() == typeof(bool)) {
+                    Trace.Write(obj);
+                } else {
+                    throw new ArgumentException(String.Concat("Unexpected type: ", obj.GetType().FullName));
                 }
                 Trace.Write(", ");
             }

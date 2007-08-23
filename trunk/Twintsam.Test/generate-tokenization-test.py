@@ -67,7 +67,12 @@ for test in tests['tests']:
 		if token == 'ParseError':
 			expectedOutput += u'"ParseError", '
 		elif token[0] == 'DOCTYPE':
-			expectedOutput += u'new object[] { "DOCTYPE", "%s", %s }, ' % (token[1].replace('"', r'\"'), token[2] and 'true' or 'false')
+			expectedOutput += u'new object[] { "DOCTYPE", "%s", %s, %s, %s }, ' % (
+				token[1].replace('"', r'\"'),
+				token[2] is None and 'null' or '"' + token[2].replace('"', r'\"') + '"',
+				token[3] is None and 'null' or '"' + token[3].replace('"', r'\"') + '"',
+				token[4] and 'true' or 'false'
+				)
 		elif token[0] == 'StartTag':
 			expectedOutput += u'new object[] { "StartTag", "%s", ' % token[1].replace('"', r'\"')
 			expectedOutput += u'new KeyValuePair<string,string>[] { '
