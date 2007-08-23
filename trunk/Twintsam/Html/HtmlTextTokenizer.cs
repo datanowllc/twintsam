@@ -345,6 +345,21 @@ namespace Twintsam.Html
                 case ParsingFunction.MarkupDeclarationOpen:
                     ParseMarkupDeclarationOpen();
                     break;
+                case ParsingFunction.CommentStart:
+                    ParseCommentStart();
+                    break;
+                case ParsingFunction.CommentStartDash:
+                    ParseCommentStartDash();
+                    break;
+                case ParsingFunction.Comment:
+                    ParseComment();
+                    break;
+                case ParsingFunction.CommentEndDash:
+                    ParseCommentEndDash();
+                    break;
+                case ParsingFunction.CommentEnd:
+                    ParseCommentEnd();
+                    break;
                 default:
                     throw new NotImplementedException();
                 }
@@ -1007,6 +1022,152 @@ namespace Twintsam.Html
                 OnParseError("Bogus comment");
                 _currentParsingFunction = ParsingFunction.BogusComment;
                 break;
+            }
+        }
+
+        private void ParseCommentStart()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#comment0
+            Debug.Assert(_buffer.Length == 0);
+            switch (_input.Peek()) {
+            case '-':
+                _input.Read();
+                _currentParsingFunction = ParsingFunction.CommentStartDash;
+                break;
+            case '>':
+                _input.Read();
+                OnParseError("Invalid comment <!-->");
+                Debug.Assert(_buffer.Length == 0);
+                _value = _buffer.ToString();
+                _buffer.Length = 0;
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            case -1:
+                OnParseError("Unexpected end of stream at start of comment");
+                Debug.Assert(_buffer.Length == 0);
+                _value = _buffer.ToString();
+                _buffer.Length = 0;
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            default:
+                _buffer.Append((char)_input.Read());
+                _currentParsingFunction = ParsingFunction.Comment;
+                break;
+            }
+        }
+
+        private void ParseCommentStartDash()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#comment1
+            Debug.Assert(_buffer.Length == 0);
+            switch (_input.Peek()) {
+            case '-':
+                _input.Read();
+                _currentParsingFunction = ParsingFunction.CommentEnd;
+                break;
+            case '>':
+                _input.Read();
+                OnParseError("Invalid comment <!--->");
+                Debug.Assert(_buffer.Length == 0);
+                _value = _buffer.ToString();
+                _buffer.Length = 0;
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            case -1:
+                OnParseError("Unexpected end of stream at start of comment");
+                Debug.Assert(_buffer.Length == 0);
+                _value = _buffer.ToString();
+                _buffer.Length = 0;
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            default:
+                _buffer.Append('-');
+                _buffer.Append((char)_input.Read());
+                _currentParsingFunction = ParsingFunction.Comment;
+                break;
+            }
+        }
+
+        private void ParseComment()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#comment1
+            while (_currentParsingFunction == ParsingFunction.Comment) {
+                switch (_input.Peek()) {
+                case '-':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.CommentEndDash;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in comment");
+                    _value = _buffer.ToString();
+                    _buffer.Length = 0;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+        }
+
+        private void ParseCommentEndDash()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#comment2
+            switch (_input.Peek()) {
+            case '-':
+                _input.Read();
+                _currentParsingFunction = ParsingFunction.CommentEnd;
+                break;
+            case -1:
+                OnParseError("Unexpected end of stream in comment");
+                _value = _buffer.ToString();
+                _buffer.Length = 0;
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            default:
+                _buffer.Append('-');
+                _buffer.Append((char)_input.Read());
+                _currentParsingFunction = ParsingFunction.Comment;
+                break;
+            }
+        }
+
+        private void ParseCommentEnd()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#comment3
+            while (_currentParsingFunction == ParsingFunction.CommentEnd) {
+                switch (_input.Peek()) {
+                case '>':
+                    _value = _buffer.ToString();
+                    _buffer.Length = 0;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case '-':
+                    _input.Read();
+                    OnParseError("Double-dash (or more) in comment");
+                    _buffer.Append('-');
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream at end of comment");
+                    _value = _buffer.ToString();
+                    _buffer.Length = 0;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    OnParseError("Double-dash (or more) in comment");
+                    _buffer.Append("--");
+                    _buffer.Append((char)_input.Read());
+                    _currentParsingFunction = ParsingFunction.Comment;
+                    break;
+                }
             }
         }
 
