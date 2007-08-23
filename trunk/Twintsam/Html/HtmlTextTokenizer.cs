@@ -96,6 +96,8 @@ namespace Twintsam.Html
         private bool _escapeFlag;
         private ParsingFunction _currentParsingFunction = ParsingFunction.Initial;
 
+        private StringBuilder _buffer = new StringBuilder();
+
         #region Constructors
         // TODO: add overloads with 'string inputUri' and Stream arguments
         public HtmlTextTokenizer(TextReader input)
@@ -586,7 +588,8 @@ namespace Twintsam.Html
                     // So why bother forgetting those read characters and re-read them in the Tag Name State? Just jump to the Tag Name State.
                     _input.UnsetMark();
                     InitToken(XmlNodeType.EndElement);
-                    _name = _lastEmittedStartTagName;
+                    Debug.Assert(_buffer.Length == 0);
+                    _buffer.Append(_lastEmittedStartTagName);
                     _currentParsingFunction = ParsingFunction.TagName;
                     break;
                 default:
@@ -619,12 +622,8 @@ namespace Twintsam.Html
 
         private void ParseTagName()
         {
+            Debug.Assert(_tokenType == XmlNodeType.Element || _tokenType == XmlNodeType.EndElement);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#tag-name0
-            StringBuilder sb = new StringBuilder();
-            // XXX: _name might have been initialized in ParseCloseTagOpen
-            if (_name != null) {
-                sb.Append(_name);
-            }
             while (_currentParsingFunction == ParsingFunction.TagName) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -646,7 +645,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(sb.ToString())) {
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_buffer.ToString())) {
                         OnParseError("Not a permitted slash");
                     }
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
@@ -656,11 +655,12 @@ namespace Twintsam.Html
                     if ('A' <= c && c <= 'Z') {
                         c += (char)0x0020;
                     }
-                    sb.Append(c);
+                    _buffer.Append(c);
                     break;
                 }
             }
-            _name = sb.ToString();
+            _name = _buffer.ToString();
+            _buffer.Length = 0;
         }
 
         private void ParseBeforeAttributeName()
@@ -701,8 +701,9 @@ namespace Twintsam.Html
 
         private void ParseAttributeName()
         {
+            Debug.Assert(_tokenType == XmlNodeType.Element || _tokenType == XmlNodeType.EndElement);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute1
-            StringBuilder sb = new StringBuilder();
+            Debug.Assert(_buffer.Length == 0);
             while (_currentParsingFunction == ParsingFunction.AttributeName) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -724,7 +725,7 @@ namespace Twintsam.Html
                     break;
                 case '/':
                     _input.Read();
-                    if (_input.Peek() != '>' || !Constants.IsVoidElement(sb.ToString())) {
+                    if (_input.Peek() != '>' || !Constants.IsVoidElement(_name.ToString())) {
                         OnParseError("Not a permitted slash");
                     }
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
@@ -738,12 +739,13 @@ namespace Twintsam.Html
                     if ('A' <= c && c <= 'Z') {
                         c += (char)0x0020;
                     }
-                    sb.Append(c);
+                    _buffer.Append(c);
                     break;
                 }
             }
 
-            _attributes.Add(new Attribute(sb.ToString()));
+            _attributes.Add(new Attribute(_buffer.ToString()));
+            _buffer.Length = 0;
         }
 
         private void ParseAfterAttributeName()
@@ -836,34 +838,35 @@ namespace Twintsam.Html
             Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '"');
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute2
-            StringBuilder sb = new StringBuilder();
+            Debug.Assert(_buffer.Length == 0);
             while (_currentParsingFunction == ParsingFunction.AttributeValueDoubleQuoted) {
                 switch (_input.Peek()) {
                 case '"':
                     _input.Read();
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case '&':
                     _input.Read();
                     string character = ConsumeEntity(true);
                     if (String.IsNullOrEmpty(character)) {
-                        sb.Append('&');
+                        _buffer.Append('&');
                     } else {
-                        sb.Append(character);
+                        _buffer.Append(character);
                     }
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute value");
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
-                    sb.Append((char)_input.Read());
+                    _buffer.Append((char)_input.Read());
                     break;
                 }
             }
+            _buffer.Length = 0;
         }
 
         private void ParseAttributeValueSingleQuoted()
@@ -872,34 +875,35 @@ namespace Twintsam.Html
             Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == '\'');
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute3
-            StringBuilder sb = new StringBuilder();
+            Debug.Assert(_buffer.Length == 0);
             while (_currentParsingFunction == ParsingFunction.AttributeValueSingleQuoted) {
                 switch (_input.Peek()) {
                 case '\'':
                     _input.Read();
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case '&':
                     _input.Read();
                     string character = ConsumeEntity(true);
                     if (String.IsNullOrEmpty(character)) {
-                        sb.Append('&');
+                        _buffer.Append('&');
                     } else {
-                        sb.Append(character);
+                        _buffer.Append(character);
                     }
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute value");
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
-                    sb.Append((char)_input.Read());
+                    _buffer.Append((char)_input.Read());
                     break;
                 }
             }
+            _buffer.Length = 0;
         }
 
         private void ParseAttributeValueUnquoted()
@@ -908,7 +912,7 @@ namespace Twintsam.Html
             Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
 
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#attribute4
-            StringBuilder sb = new StringBuilder();
+            Debug.Assert(_buffer.Length == 0);
             while (_currentParsingFunction == ParsingFunction.AttributeValueUnquoted) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -917,35 +921,36 @@ namespace Twintsam.Html
                 case '\f':
                 case ' ':
                     _input.Read();
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case '&':
                     _input.Read();
                     string character = ConsumeEntity(true);
                     if (String.IsNullOrEmpty(character)) {
-                        sb.Append('&');
+                        _buffer.Append('&');
                     } else {
-                        sb.Append(character);
+                        _buffer.Append(character);
                     }
                     break;
                 case '>':
                     _input.Read();
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute value");
-                    _attributes[_attributes.Count - 1].value = sb.ToString();
+                    _attributes[_attributes.Count - 1].value = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
-                    sb.Append((char)_input.Read());
+                    _buffer.Append((char)_input.Read());
                     break;
                 }
             }
+            _buffer.Length = 0;
         }
 
         private void ParseBogusComment()
@@ -954,11 +959,12 @@ namespace Twintsam.Html
             Debug.Assert(ContentModel == ContentModel.Pcdata);
 
             InitToken(XmlNodeType.Comment);
-            StringBuilder sb = new StringBuilder();
+            Debug.Assert(_buffer.Length == 0);
             for (int c = _input.Peek(); c >= 0 && c != '>'; c = _input.Peek()) {
-                sb.Append((char)_input.Read());
+                _buffer.Append((char)_input.Read());
             }
-            _value = sb.ToString();
+            _value = _buffer.ToString();
+            _buffer.Length = 0;
             if (_input.Peek() == '>') {
                 _input.Read();
             }
