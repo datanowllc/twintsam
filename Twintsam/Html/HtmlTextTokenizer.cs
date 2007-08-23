@@ -360,8 +360,44 @@ namespace Twintsam.Html
                 case ParsingFunction.CommentEnd:
                     ParseCommentEnd();
                     break;
+                case ParsingFunction.Doctype:
+                    ParseDoctype();
+                    break;
+                case ParsingFunction.DoctypeName:
+                    ParseDoctypeName();
+                    break;
+                case ParsingFunction.AfterDoctypeName:
+                    ParseAfterDoctypeName();
+                    break;
+                case ParsingFunction.BeforeDoctypePublicId:
+                    ParseBeforeDoctypePublicId();
+                    break;
+                case ParsingFunction.DoctypePublicIdDoubleQuoted:
+                    ParseDoctypePublicIdDoubleQuoted();
+                    break;
+                case ParsingFunction.DoctypePublicIdSingleQuoted:
+                    ParseDoctypePublicIdSingleQuoted();
+                    break;
+                case ParsingFunction.AfterDoctypePublicId:
+                    ParseAfterDoctypePublicId();
+                    break;
+                case ParsingFunction.BeforeDoctypeSystemId:
+                    ParseBeforeDoctypeSystemId();
+                    break;
+                case ParsingFunction.DoctypeSystemIdDoubleQuoted:
+                    ParseDoctypeSystemIdDoubleQuoted();
+                    break;
+                case ParsingFunction.DoctypeSystemIdSingleQuoted:
+                    ParseDoctypeSystemIdSingleQuoted();
+                    break;
+                case ParsingFunction.AfterDoctypeSystemId:
+                    ParseAfterDoctypeSystemId();
+                    break;
+                case ParsingFunction.BogusDoctype:
+                    ParseBogusDoctype();
+                    break;
                 default:
-                    throw new NotImplementedException();
+                    throw new InvalidOperationException();
                 }
             } while (_tokenState == TokenState.Uninitialized
                 || (_tokenState == TokenState.Initialized && _textToken.Length == 0));
@@ -1166,6 +1202,456 @@ namespace Twintsam.Html
                     _buffer.Append("--");
                     _buffer.Append((char)_input.Read());
                     _currentParsingFunction = ParsingFunction.Comment;
+                    break;
+                }
+            }
+        }
+
+        private void ParseDoctype()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype0
+            switch (_input.Peek()) {
+            case '\t':
+            case '\n':
+            case '\v':
+            case '\f':
+            case ' ':
+                _input.Read();
+                break;
+            default:
+                OnParseError("???");
+                break;
+            }
+            _currentParsingFunction = ParsingFunction.BeforeDoctypeName;
+        }
+
+        private void ParseBeforeDoctypeName()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before1
+            while (_currentParsingFunction == ParsingFunction.BeforeDoctypeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '>':
+                    _input.Read();
+                    OnParseError("???");
+                    InitToken(XmlNodeType.DocumentType);
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream before DOCTYPE name");
+                    InitToken(XmlNodeType.DocumentType);
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    InitToken(XmlNodeType.DocumentType);
+                    Debug.Assert(_buffer.Length == 0);
+                    _buffer.Append((char)_input.Read());
+                    _currentParsingFunction = ParsingFunction.DoctypeName;
+                    break;
+                }
+            }
+        }
+
+        private void ParseDoctypeName()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype1
+            while (_currentParsingFunction == ParsingFunction.DoctypeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterDoctypeName;
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE name");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+            _name = _buffer.ToString();
+            _buffer.Length = 0;
+        }
+
+        private void ParseAfterDoctypeName()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after0
+            while (_currentParsingFunction == ParsingFunction.AfterDoctypeName) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE name");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Mark();
+                    switch (_input.Read()) {
+                    case 'P':
+                    case 'p':
+                        foreach (char c1 in "UBLIC") {
+                            int c2 = _input.Read();
+                            if ('A' <= c2 && c2 <= 'Z') {
+                                c2 += (char)0x0020;
+                            }
+                            if (c2 < 0 || c1 != c2) {
+                                goto default;
+                            }
+                        }
+                        _input.UnsetMark();
+                        _currentParsingFunction = ParsingFunction.BeforeDoctypePublicId;
+                        break;
+                    case 'S':
+                    case 's':
+                        foreach (char c1 in "YSTEM") {
+                            int c2 = _input.Read();
+                            if ('A' <= c2 && c2 <= 'Z') {
+                                c2 += (char)0x0020;
+                            }
+                            if (c2 < 0 || c1 != c2) {
+                                goto default;
+                            }
+                        }
+                        _input.UnsetMark();
+                        _currentParsingFunction = ParsingFunction.BeforeDoctypeSystemId;
+                        break;
+                    default:
+                        _input.ResetToMark();
+                        _input.Read();
+                        OnParseError("Unexpected character after DOCTYPE name");
+                        _currentParsingFunction = ParsingFunction.BogusDoctype;
+                        break;
+                    }
+                    break;
+                }
+            }
+        }
+
+        private void ParseBeforeDoctypePublicId()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before2
+            while (_currentParsingFunction == ParsingFunction.BeforeDoctypePublicId) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '"':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypePublicIdDoubleQuoted;
+                    break;
+                case '\'':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypePublicIdSingleQuoted;
+                    break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected end of DOCTYPE before public identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream before DOCTYPE public identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Read();
+                    OnParseError("Unexpected character before DOCTYPE public identifier");
+                    _currentParsingFunction = ParsingFunction.BogusDoctype;
+                    break;
+                }
+            }
+        }
+
+        private void ParseDoctypePublicIdDoubleQuoted()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype2
+            Debug.Assert(_buffer.Length == 0);
+            while (_currentParsingFunction == ParsingFunction.DoctypePublicIdDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '"':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterDoctypePublicId;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE public identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+            Attribute attr = new Attribute("PUBLIC");
+            attr.value = _buffer.ToString();
+            _buffer.Length = 0;
+            attr.quoteChar = '"';
+            Debug.Assert(_attributes.Count == 0);
+            _attributes.Add(attr);
+        }
+
+        private void ParseDoctypePublicIdSingleQuoted()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype3
+            Debug.Assert(_buffer.Length == 0);
+            while (_currentParsingFunction == ParsingFunction.DoctypePublicIdDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '\'':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterDoctypePublicId;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE public identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+            Attribute attr = new Attribute("PUBLIC");
+            attr.value = _buffer.ToString();
+            _buffer.Length = 0;
+            attr.quoteChar = '\'';
+            Debug.Assert(_attributes.Count == 0);
+            _attributes.Add(attr);
+        }
+
+        private void ParseAfterDoctypePublicId()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after1
+            while (_currentParsingFunction == ParsingFunction.AfterDoctypePublicId) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '"':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypeSystemIdDoubleQuoted;
+                    break;
+                case '\'':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypeSystemIdSingleQuoted;
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream after DOCTYPE public identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Read();
+                    OnParseError("Unexpected character after DOCTYPE public identifier");
+                    _currentParsingFunction = ParsingFunction.BogusDoctype;
+                    break;
+                }
+            }
+        }
+
+        private void ParseBeforeDoctypeSystemId()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before3
+            while (_currentParsingFunction == ParsingFunction.BeforeDoctypeSystemId) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '"':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypeSystemIdDoubleQuoted;
+                    break;
+                case '\'':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.DoctypeSystemIdSingleQuoted;
+                    break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected end of DOCTYPE before system identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream before fter DOCTYPE system identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Read();
+                    OnParseError("Unexpected character before DOCTYPE system identifier");
+                    _currentParsingFunction = ParsingFunction.BogusDoctype;
+                    break;
+                }
+            }
+        }
+
+        private void ParseDoctypeSystemIdDoubleQuoted()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype4
+            Debug.Assert(_buffer.Length == 0);
+            while (_currentParsingFunction == ParsingFunction.DoctypeSystemIdDoubleQuoted) {
+                switch (_input.Peek()) {
+                case '"':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterDoctypeSystemId;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE system identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+            Attribute attr = new Attribute("SYSTEM");
+            attr.value = _buffer.ToString();
+            _buffer.Length = 0;
+            attr.quoteChar = '"';
+            Debug.Assert(_attributes.Count == 0 || (_attributes.Count == 1 && _attributes[0].name == "PUBLIC"));
+            _attributes.Add(attr);
+        }
+
+        private void ParseDoctypeSystemIdSingleQuoted()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype5
+            Debug.Assert(_buffer.Length == 0);
+            while (_currentParsingFunction == ParsingFunction.DoctypeSystemIdSingleQuoted) {
+                switch (_input.Peek()) {
+                case '\'':
+                    _input.Read();
+                    _currentParsingFunction = ParsingFunction.AfterDoctypeSystemId;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in DOCTYPE system identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _buffer.Append((char)_input.Read());
+                    break;
+                }
+            }
+            Attribute attr = new Attribute("SYSTEM");
+            attr.value = _buffer.ToString();
+            _buffer.Length = 0;
+            attr.quoteChar = '\'';
+            Debug.Assert(_attributes.Count == 0 || (_attributes.Count == 1 && _attributes[0].name == "PUBLIC"));
+            _attributes.Add(attr);
+        }
+
+        private void ParseAfterDoctypeSystemId()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after2
+            while (_currentParsingFunction == ParsingFunction.AfterDoctypeSystemId) {
+                switch (_input.Peek()) {
+                case '\t':
+                case '\n':
+                case '\v':
+                case '\f':
+                case ' ':
+                    _input.Read();
+                    break;
+                case '>':
+                    _input.Read();
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream after DOCTYPE system identifier");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Read();
+                    OnParseError("Unexpected character after DOCTYPE system identifier");
+                    _currentParsingFunction = ParsingFunction.BogusDoctype;
+                    break;
+                }
+            }
+        }
+
+        private void ParseBogusDoctype()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#bogus0
+            while (_currentParsingFunction == ParsingFunction.BogusDoctype) {
+                switch (_input.Peek()) {
+                case '>':
+                    _input.Read();
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                case -1:
+                    OnParseError("Unexpected end of stream in bogus DOCTYPE");
+                    _incorrectDoctype = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
+                default:
+                    _input.Read();
                     break;
                 }
             }
