@@ -10,16 +10,37 @@ namespace Twintsam.Html
 {
     public class HtmlTextTokenizer : HtmlTokenizer, IXmlLineInfo
     {
-        private class Attribute
+        private class Attribute : IXmlLineInfo
         {
             public string name;
             public string value = "";
             public char quoteChar = ' ';
 
-            public Attribute(string name)
+            public bool isDuplicate;
+
+            private bool _hasLineInfo;
+            private int _lineNumber;
+            private int _linePosition;
+
+            public Attribute(string name, IXmlLineInfo lineInfo)
+                : this(name, false, lineInfo) { }
+
+            public Attribute(string name, bool isDuplicate, IXmlLineInfo lineInfo)
             {
                 this.name = name;
+
+                this.isDuplicate = isDuplicate;
+
+                _hasLineInfo = lineInfo.HasLineInfo();
+                _lineNumber = lineInfo.LineNumber;
+                _linePosition = lineInfo.LinePosition;
             }
+
+            #region IXmlLineInfo Members
+            public bool HasLineInfo() { return _hasLineInfo; }
+            public int LineNumber { get { return _lineNumber; } }
+            public int LinePosition { get { return _linePosition; } }
+            #endregion
         }
 
         /// <summary>
@@ -405,10 +426,29 @@ namespace Twintsam.Html
             } while (_tokenState == TokenState.Uninitialized
                 || (_tokenState == TokenState.Initialized && _textToken.Length == 0));
 
-            if (_tokenState == TokenState.Complete
-                && TokenType == XmlNodeType.EndElement && HasAttributes) {
-                _contentModel = ContentModel.Pcdata;
-                OnParseError("End tag with attributes");
+            if (_tokenState == TokenState.Complete){
+                switch (_tokenType) {
+                case XmlNodeType.Element:
+                case XmlNodeType.EndElement:
+                    // Check duplicate attributes
+                    _attributes.RemoveAll(
+                        delegate(Attribute attr)
+                        {
+                            if (attr.isDuplicate) {
+                                OnParseError(new ParseErrorEventArgs(String.Concat("Duplicate attribute: ", attr.name), attr));
+                                return true;
+                            }
+                            return false;
+                        }
+                    );
+                    if (_tokenType == XmlNodeType.EndElement) {
+                        _contentModel = ContentModel.Pcdata;
+                        if (_attributes.Count > 0) {
+                            OnParseError("End tag with attributes");
+                        }
+                    }
+                    break;
+                }
             }
             return true;
         }
@@ -795,7 +835,17 @@ namespace Twintsam.Html
                 }
             }
 
-            _attributes.Add(new Attribute(_buffer.ToString()));
+            string attrName = _buffer.ToString();
+            _attributes.Add(
+                new Attribute(
+                attrName,
+                _attributes.Exists(
+                    delegate(Attribute attr)
+                    {
+                        return String.Equals(attr.name, attrName, StringComparison.Ordinal);
+                    }
+                ),
+                this));
             _buffer.Length = 0;
         }
 
@@ -1424,7 +1474,7 @@ namespace Twintsam.Html
                     break;
                 }
             }
-            Attribute attr = new Attribute("PUBLIC");
+            Attribute attr = new Attribute("PUBLIC", this);
             attr.value = _buffer.ToString();
             _buffer.Length = 0;
             attr.quoteChar = '"';
@@ -1453,7 +1503,7 @@ namespace Twintsam.Html
                     break;
                 }
             }
-            Attribute attr = new Attribute("PUBLIC");
+            Attribute attr = new Attribute("PUBLIC", this);
             attr.value = _buffer.ToString();
             _buffer.Length = 0;
             attr.quoteChar = '\'';
@@ -1564,7 +1614,7 @@ namespace Twintsam.Html
                     break;
                 }
             }
-            Attribute attr = new Attribute("SYSTEM");
+            Attribute attr = new Attribute("SYSTEM", this);
             attr.value = _buffer.ToString();
             _buffer.Length = 0;
             attr.quoteChar = '"';
@@ -1593,7 +1643,7 @@ namespace Twintsam.Html
                     break;
                 }
             }
-            Attribute attr = new Attribute("SYSTEM");
+            Attribute attr = new Attribute("SYSTEM", this);
             attr.value = _buffer.ToString();
             _buffer.Length = 0;
             attr.quoteChar = '\'';
