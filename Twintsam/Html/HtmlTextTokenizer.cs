@@ -363,6 +363,9 @@ namespace Twintsam.Html
                 case ParsingFunction.Doctype:
                     ParseDoctype();
                     break;
+                case ParsingFunction.BeforeDoctypeName:
+                    ParseBeforeDoctypeName();
+                    break;
                 case ParsingFunction.DoctypeName:
                     ParseDoctypeName();
                     break;
@@ -576,9 +579,6 @@ namespace Twintsam.Html
                 } else if (c == '/') {
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.CloseTagOpen;
-                } else if (c == '!') {
-                    _input.Read();
-                    _currentParsingFunction = ParsingFunction.MarkupDeclarationOpen;
                 } else if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
                     InitToken(XmlNodeType.Element);
                     // XXX: draft says to consume the character and initialize the token name with it; we instead let ParseTagName consume the whole tag name
@@ -638,9 +638,9 @@ namespace Twintsam.Html
                     // We've already read characters matching that tag name, so the end of the Close Tag Open State algorithm is predictable.
                     // So why bother forgetting those read characters and re-read them in the Tag Name State? Just jump to the Tag Name State.
                     _input.UnsetMark();
-                    InitToken(XmlNodeType.EndElement);
                     Debug.Assert(_buffer.Length == 0);
                     _buffer.Append(_lastEmittedStartTagName);
+                    InitToken(XmlNodeType.EndElement);
                     _currentParsingFunction = ParsingFunction.TagName;
                     break;
                 default:
@@ -1041,10 +1041,10 @@ namespace Twintsam.Html
                 }
             case 'D':
             case 'd':
-                foreach (char c1 in "OCTYPE") {
+                foreach (char c1 in "octype") {
                     int c2 = _input.Read();
                     if ('A' <= c2 && c2 <= 'Z') {
-                        c2 += (char)0x0020;
+                        c2 += 0x0020;
                     }
                     if (c2 < 0 || c1 != c2) {
                         goto default;
@@ -1323,10 +1323,10 @@ namespace Twintsam.Html
                     switch (_input.Read()) {
                     case 'P':
                     case 'p':
-                        foreach (char c1 in "UBLIC") {
+                        foreach (char c1 in "ublic") {
                             int c2 = _input.Read();
                             if ('A' <= c2 && c2 <= 'Z') {
-                                c2 += (char)0x0020;
+                                c2 += 0x0020;
                             }
                             if (c2 < 0 || c1 != c2) {
                                 goto default;
@@ -1337,10 +1337,10 @@ namespace Twintsam.Html
                         break;
                     case 'S':
                     case 's':
-                        foreach (char c1 in "YSTEM") {
+                        foreach (char c1 in "ystem") {
                             int c2 = _input.Read();
                             if ('A' <= c2 && c2 <= 'Z') {
-                                c2 += (char)0x0020;
+                                c2 += 0x0020;
                             }
                             if (c2 < 0 || c1 != c2) {
                                 goto default;
@@ -1436,7 +1436,7 @@ namespace Twintsam.Html
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype3
             Debug.Assert(_buffer.Length == 0);
-            while (_currentParsingFunction == ParsingFunction.DoctypePublicIdDoubleQuoted) {
+            while (_currentParsingFunction == ParsingFunction.DoctypePublicIdSingleQuoted) {
                 switch (_input.Peek()) {
                 case '\'':
                     _input.Read();

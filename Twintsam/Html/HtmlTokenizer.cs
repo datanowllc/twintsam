@@ -32,7 +32,7 @@ namespace Twintsam.Html
         public abstract bool HasTrailingSolidus { get; }
         public abstract bool IsIncorrectDoctype { get; }
         public abstract string Value { get; }
-        public virtual bool HasAttributes { get { return AttributeCount <= 0; } }
+        public virtual bool HasAttributes { get { return AttributeCount > 0; } }
         public abstract int AttributeCount { get; }
         public virtual string this[int index] { get { return GetAttribute(index); } }
         public virtual string this[string name] { get { return GetAttribute(name); } }
