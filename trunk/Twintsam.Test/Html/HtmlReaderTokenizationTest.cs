@@ -139,6 +139,24 @@ namespace Twintsam.Html
         }
 
         [Conditional("TRACE")]
+        private void TraceString(string str)
+        {
+            Trace.Write('"');
+            foreach (char c in str) {
+                if (c == '\\') {
+                    Trace.Write("\\\\");
+                } else if (c == '"') {
+                    Trace.Write("\\\"");
+                } else if (32 <= c && c <= 127) {
+                    Trace.Write(c);
+                } else {
+                    Trace.Write(String.Concat("\\u", ((int)c).ToString("X").PadLeft(4, '0')));
+                }
+            }
+            Trace.Write('"');
+        }
+
+        [Conditional("TRACE")]
         private void TraceOutput(ICollection collection)
         {
             Trace.Write("{ ");
@@ -147,24 +165,20 @@ namespace Twintsam.Html
                     TraceOutput((ICollection)obj);
                 } else if (obj is KeyValuePair<string,string>) {
                     KeyValuePair<string, string> pair = (KeyValuePair<string, string>)obj;
-                    Trace.Write('"');
-                    Trace.Write(pair.Key);
-                    Trace.Write("\"=\"");
-                    Trace.Write(pair.Value);
-                    Trace.Write('"');
+                    TraceString(pair.Key);
+                    Trace.Write("=");
+                    TraceString(pair.Value);
                 }
                 else if (obj is ParseErrorEventArgs)
                 {
                     ParseErrorEventArgs args = (ParseErrorEventArgs)obj;
-                    Trace.Write("[\"ParseError\", \"");
-                    Trace.Write(args.Message);
-                    Trace.Write("\"]");
+                    Trace.Write("[\"ParseError\", ");
+                    TraceString(args.Message);
+                    Trace.Write("]");
                 }
                 else
                 {
-                    Trace.Write('"');
-                    Trace.Write(obj);
-                    Trace.Write('"');
+                    TraceString(obj == null ? "" : obj.ToString());
                 }
                 Trace.Write(", ");
             }
