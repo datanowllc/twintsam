@@ -39,14 +39,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Html\HtmlReaderTest.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.test1.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.test2.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.test3.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.test4.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.contentModelFlags.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.escapeFlag.test.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.entities.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.test1.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.test2.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.test3.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.test4.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.contentModelFlags.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.escapeFlag.test.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.entities.test.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests1.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests2.dat.cs" />
@@ -102,11 +102,11 @@
   </Target>
   <Target Name="AfterBuild">
   </Target>
-  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename)%(Extension).cs')">
+  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlTextTokenizerTest.%(Filename)%(Extension).cs')">
     <CreateProperty Value="%(TokenizationTestGenerator.Identity)">
       <Output TaskParameter="Value" PropertyName="TokenizationTestGenerator" />
     </CreateProperty>
-    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTokenizationTest.%(TokenizationTestData.Filename)%(TokenizationTestData.Extension).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
+    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlTextTokenizerTest.%(TokenizationTestData.Filename)%(TokenizationTestData.Extension).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
   </Target>
   <Target Name="GenerateTreeConstructionTests" Inputs="@(TreeConstructionTestData);@(TreeConstructionTestGenerator)" Outputs="@(TreeConstructionTestData->'Html\HtmlReaderTreeConstructionTest.%(Filename)%(Extension).cs')">
     <CreateProperty Value="%(TreeConstructionTestGenerator.Identity)">
