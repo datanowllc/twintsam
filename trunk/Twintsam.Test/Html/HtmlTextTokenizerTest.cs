@@ -21,7 +21,7 @@ using System.Collections.Generic;
 namespace Twintsam.Html
 {
     [TestClass]
-    public partial class HtmlReaderTokenizationTest
+    public partial class HtmlTextTokenizerTest
     {
         private ArrayList actualOutput = new ArrayList();
 

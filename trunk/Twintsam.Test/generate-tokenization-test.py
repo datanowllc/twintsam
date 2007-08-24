@@ -38,7 +38,7 @@ using System.Collections.Generic;
 
 namespace Twintsam.Html
 {
-    public partial class HtmlReaderTokenizationTest
+    public partial class HtmlTextTokenizerTest
     {
 """)
 

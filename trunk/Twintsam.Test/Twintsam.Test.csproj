@@ -39,7 +39,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Html\HtmlReaderTest.cs" />
-    <Compile Include="Html\HtmlReaderTokenizationTest.cs" />
+    <Compile Include="Html\HtmlTextTokenizerTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
     <Compile Include="IO\PreambleDetectorTest.cs" />
     <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
@@ -92,12 +92,12 @@
   </Target>
   <Target Name="AfterBuild">
   </Target>
-  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename)%(Extension).cs')">
+  <Target Name="GenerateTokenizationTests" Inputs="@(TokenizationTestData);@(TokenizationTestGenerator)" Outputs="@(TokenizationTestData->'Html\HtmlTextTokenizerTest.%(Filename)%(Extension).cs')">
     <CreateProperty Value="%(TokenizationTestGenerator.Identity)">
       <Output TaskParameter="Value" PropertyName="TokenizationTestGenerator" />
     </CreateProperty>
-    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlReaderTokenizationTest.%(TokenizationTestData.Filename)%(TokenizationTestData.Extension).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
-    <CreateItem Include="@(TokenizationTestData->'Html\HtmlReaderTokenizationTest.%(Filename)%(Extension).cs')">
+    <Exec Command="$(TokenizationTestGenerator) &quot;%(TokenizationTestData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\Html\HtmlTextTokenizerTest.%(TokenizationTestData.Filename)%(TokenizationTestData.Extension).cs&quot; %(TokenizationTestData.Filename)%(TokenizationTestData.Extension)" />
+    <CreateItem Include="@(TokenizationTestData->'Html\HtmlTextTokenizerTest.%(Filename)%(Extension).cs')">
       <Output TaskParameter="Include" ItemName="Compile" />
       <Output TaskParameter="Include" ItemName="FileWrites" />
     </CreateItem>
