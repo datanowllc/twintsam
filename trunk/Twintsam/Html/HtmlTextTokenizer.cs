@@ -646,7 +646,6 @@ namespace Twintsam.Html
                     PrepareTextToken("<>");
                     _currentParsingFunction = ParsingFunction.Data;
                 } else if (c == '?') {
-                    _input.Read();
                     OnParseError("Bogus comment starting with <?");
                     _currentParsingFunction = ParsingFunction.BogusComment;
                 } else {
@@ -1088,8 +1087,9 @@ namespace Twintsam.Html
             Debug.Assert(ContentModel == ContentModel.Pcdata);
 
             _input.Mark();
-            switch (_input.Read()) {
+            switch (_input.Peek()) {
             case '-':
+                _input.Read();
                 if (_input.Read() == '-') {
                     _input.UnsetMark();
                     InitToken(XmlNodeType.Comment);
@@ -1100,6 +1100,7 @@ namespace Twintsam.Html
                 }
             case 'D':
             case 'd':
+                _input.Read();
                 foreach (char c1 in "octype") {
                     int c2 = _input.Read();
                     if ('A' <= c2 && c2 <= 'Z') {
