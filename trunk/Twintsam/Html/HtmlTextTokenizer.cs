@@ -1820,69 +1820,117 @@ namespace Twintsam.Html
         private string ConsumeNamedEntity(bool inAttributeValue)
         {
             _input.Mark();
-            StringBuilder entityName = new StringBuilder(HtmlEntities.LonguestEntityNameLength);
-            while (entityName.Length <= HtmlEntities.LonguestEntityNameLength) {
-                int c = _input.Peek();
-                if (c < 0 || c == ';') {
-                    break;
-                }
-                entityName.Append((char)_input.Read());
-            }
-
-            if (entityName.Length == 0) {
-                if (_input.Peek() < 0) {
-                    OnParseError("Unexpected end of file in character entity");
-                } else {
-                    OnParseError("Empty entity name &;");
-                }
-                _input.ResetToMark();
-                return null;
-            }
-
-            int foundChar = -1;
-
+            EntityNameCharacter foundChar = null;
             // Just for the ParseError below:
-            string name = entityName.ToString();
-
-            int nextChar = _input.Peek();
-            if (nextChar == ';' && HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)) {
-                _input.Read();
-            } else {
-                if (nextChar == ';') {
-                    nextChar = entityName[entityName.Length - 1];
-                    entityName.Length--;
-                }
-                while (entityName.Length >= HtmlEntities.ShortestEntityNameLength) {
-                    if (inAttributeValue) {
-                        while ((('0' <= nextChar && nextChar <= '9')
-                                || ('A' <= nextChar && nextChar <= 'Z')
-                                || ('a' <= nextChar && nextChar <= 'z'))
-                               && entityName.Length > 0) {
-                            nextChar = entityName[entityName.Length - 1];
-                            entityName.Length--;
-                        }
+            StringBuilder entityName = new StringBuilder(HtmlEntities.LonguestEntityNameLength);
+            EntityNameCharacter entityNameCharacter = EntityNameCharacter.Root;
+            do {
+                int c = _input.Read();
+                if (c < 0) {
+                    OnParseError("Unexpected end of file in character entity");
+                    _input.ResetToMark();
+                    break;
+                } else if (c == ';') {
+                    if (foundChar == null) {
+                        OnParseError(String.Concat("Unknown named entity: ", entityName.ToString()));
                     }
-
-                    if (HtmlEntities.TryGetChar(entityName.ToString(), out foundChar)
-                        && HtmlEntities.IsMissingSemiColonRecoverable(entityName.ToString())) {
-                        OnParseError("Entity does not end with a semi-colon");
+                    _input.ResetToMark();
+                    break;
+                } else {
+                    EntityNameCharacter tmp;
+                    if (!entityNameCharacter.TryGetEntityNameCharacter((char) c, out tmp)) {
+                        if (foundChar != null) {
+                            OnParseError("Entity does not end with a semi-colon");
+                        } else {
+                            OnParseError(String.Concat("Unescaped & or unknown named entity: ", entityName.ToString()));
+                        }
+                        _input.ResetToMark();
                         break;
                     }
-
-                    nextChar = entityName[entityName.Length - 1];
-                    entityName.Length--;
+                    entityNameCharacter = tmp;
+                    entityName.Append((char) c);
+                    c = _input.Peek();
+                    if (entityNameCharacter.HasCodepoint
+                        && (c == ';' || entityNameCharacter.IsMissingSemiColonRecoverable)) {
+                        foundChar = entityNameCharacter;
+                        // If in attribute value and next char is not [0-9A-Za-z],
+                        // we want to be able to reset to just after the '&'.
+                        // Otherwise, we consume the entity and mark the input again for lookup.
+                        if (!inAttributeValue
+                            || !(('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z'))) {
+                            _input.UnsetMark();
+                            _input.Mark();
+                        }
+                    }
                 }
-            }
+            } while (true);
 
-            if (entityName.Length < HtmlEntities.ShortestEntityNameLength) {
-                OnParseError("Named entity not found: " + name);
-                _input.ResetToMark();
+            if (foundChar == null) {
                 return null;
             }
 
-            _input.UnsetMark();
+            int nextChar = _input.Peek();
+            if (nextChar == ';') {
+                _input.Read();
+            } else if (inAttributeValue) {
+                if ((('0' <= nextChar && nextChar <= '9')
+                        || ('A' <= nextChar && nextChar <= 'Z')
+                        || ('a' <= nextChar && nextChar <= 'z'))) {
+                    return null;
+                }
+            }
 
-            return Char.ConvertFromUtf32(foundChar);
+            return Char.ConvertFromUtf32(foundChar.Codepoint);
+        }
+
+
+        private class EntityNameCharacter
+        {
+            private int? _codepoint;
+            private bool _missingSemiColonRecoverable;
+            private Dictionary<char, EntityNameCharacter> _nextChars = new Dictionary<char, EntityNameCharacter>();
+
+            private EntityNameCharacter() { }
+
+            public int Codepoint { get { return _codepoint.Value; } }
+            public bool HasCodepoint { get { return _codepoint.HasValue; } }
+            public bool IsMissingSemiColonRecoverable { get { return _missingSemiColonRecoverable; } }
+            public EntityNameCharacter this[char nextChar]
+            {
+                get
+                {
+                    return _nextChars[nextChar];
+                }
+            }
+            public bool TryGetEntityNameCharacter(char nextChar, out EntityNameCharacter entityNameCharacter)
+            {
+                return _nextChars.TryGetValue(nextChar, out entityNameCharacter);
+            }
+
+            private static EntityNameCharacter _root;
+            internal static EntityNameCharacter Root
+            {
+                get
+                {
+                    if (_root == null) {
+                        _root = new EntityNameCharacter();
+                        foreach (string entityName in HtmlEntities.EntityNames) {
+                            EntityNameCharacter entityNameCharacter = null;
+                            Dictionary<char, EntityNameCharacter> nextChars = _root._nextChars;
+                            foreach (char c in entityName) {
+                                if (!nextChars.TryGetValue(c, out entityNameCharacter)) {
+                                    entityNameCharacter = new EntityNameCharacter();
+                                    nextChars.Add(c, entityNameCharacter);
+                                }
+                                nextChars = entityNameCharacter._nextChars;
+                            }
+                            entityNameCharacter._codepoint = HtmlEntities.GetChar(entityName);
+                            entityNameCharacter._missingSemiColonRecoverable = HtmlEntities.IsMissingSemiColonRecoverable(entityName);
+                        }
+                    }
+                    return _root;
+                }
+            }
         }
         #endregion
 
