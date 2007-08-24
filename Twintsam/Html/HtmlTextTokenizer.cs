@@ -705,7 +705,7 @@ namespace Twintsam.Html
                 int c = _input.Peek();
                 if (('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')) {
                     // XXX: draft says to consume the character and initialize the token name with it; we instead let ParseTagName consume the whole tag name
-                    InitToken(XmlNodeType.Element);
+                    InitToken(XmlNodeType.EndElement);
                     _currentParsingFunction = ParsingFunction.TagName;
                 } else if (c == '>') {
                     _input.Read();
