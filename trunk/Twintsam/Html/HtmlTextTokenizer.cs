@@ -834,6 +834,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute name");
+                    EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
@@ -888,6 +889,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream after attribute name");
+                    EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
@@ -929,6 +931,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream before attribute value");
+                    EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
