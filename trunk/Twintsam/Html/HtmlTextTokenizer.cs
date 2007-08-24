@@ -748,6 +748,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in tag name");
+                    EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case '/':
