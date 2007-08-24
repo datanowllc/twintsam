@@ -1233,6 +1233,7 @@ namespace Twintsam.Html
             while (_currentParsingFunction == ParsingFunction.CommentEnd) {
                 switch (_input.Peek()) {
                 case '>':
+                    _input.Read();
                     _value = _buffer.ToString();
                     _buffer.Length = 0;
                     EmitToken();
