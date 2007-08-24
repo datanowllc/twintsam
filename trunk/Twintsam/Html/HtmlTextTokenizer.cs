@@ -584,7 +584,7 @@ namespace Twintsam.Html
                     case '>':
                         PrepareTextToken('>');
                         if (_escapeFlag && (ContentModel == ContentModel.Rcdata || ContentModel == ContentModel.Cdata)) {
-                            if (_textToken.Length >= 4 && _textToken.ToString(_textToken.Length - 4, 4).Equals("<!--", StringComparison.Ordinal)) {
+                            if (_textToken.Length >= 4 && _textToken.ToString(_textToken.Length - 3, 3).Equals("-->", StringComparison.Ordinal)) {
                                 _escapeFlag = false;
                             }
                         }
