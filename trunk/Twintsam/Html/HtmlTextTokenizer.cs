@@ -207,9 +207,9 @@ namespace Twintsam.Html
             get
             {
                 if (_textToken.Length > 0) {
-                    return null;
+                    return String.Empty;
                 }
-                return _name;
+                return _name ?? String.Empty;
             }
         }
 
@@ -242,7 +242,7 @@ namespace Twintsam.Html
                 if (_textToken.Length > 0) {
                     return _textToken.ToString();
                 }
-                return _value;
+                return _value ?? String.Empty;
             }
         }
 
@@ -262,6 +262,7 @@ namespace Twintsam.Html
             if (_textToken.Length > 0) {
                 throw new InvalidOperationException();
             }
+            Debug.Assert(_attributes[index].name != null);
             return _attributes[index].name;
         }
 
@@ -270,6 +271,10 @@ namespace Twintsam.Html
             if (_textToken.Length > 0) {
                 throw new InvalidOperationException();
             }
+#if DEBUG
+            char c = _attributes[index].quoteChar;
+            Debug.Assert(c == '"' || c == '\'' || c == ' ');
+#endif
             return _attributes[index].quoteChar;
         }
 
@@ -288,6 +293,7 @@ namespace Twintsam.Html
             }
             foreach (Attribute attribute in _attributes) {
                 if (String.Equals(attribute.name, name, StringComparison.OrdinalIgnoreCase)) {
+                    Debug.Assert(attribute.value != null);
                     return attribute.value;
                 }
             }
@@ -1273,7 +1279,7 @@ namespace Twintsam.Html
                 _input.Read();
                 break;
             default:
-                OnParseError("???");
+                OnParseError("Unexpected character in DOCTYPE");
                 break;
             }
             _currentParsingFunction = ParsingFunction.BeforeDoctypeName;
@@ -1281,6 +1287,7 @@ namespace Twintsam.Html
 
         private void ParseBeforeDoctypeName()
         {
+            Debug.Assert(_buffer.Length == 0);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#before1
             while (_currentParsingFunction == ParsingFunction.BeforeDoctypeName) {
                 switch (_input.Peek()) {
@@ -1293,7 +1300,7 @@ namespace Twintsam.Html
                     break;
                 case '>':
                     _input.Read();
-                    OnParseError("???");
+                    OnParseError("Unexpected end of DOCTYPE before DOCTYPE name");
                     InitToken(XmlNodeType.DocumentType);
                     _incorrectDoctype = true;
                     EmitToken();
@@ -1318,6 +1325,7 @@ namespace Twintsam.Html
 
         private void ParseDoctypeName()
         {
+            Debug.Assert(_buffer.Length == 1);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#doctype1
             while (_currentParsingFunction == ParsingFunction.DoctypeName) {
                 switch (_input.Peek()) {
