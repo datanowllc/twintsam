@@ -47,9 +47,28 @@ namespace Twintsam
             "a", "b", "big", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u",
         };
 
+        public static readonly string[] ElementsWithOptionalEndTag = {
+            "dd", "dt", "li", "p", "tbody", "td", "tfoot", "th", "thead", "tr",
+        };
+
         public static bool IsVoidElement(string element)
         {
             return Is(VoidElements, element);
+        }
+
+        public static bool IsCdataElement(string element)
+        {
+            return Is(CdataElements, element);
+        }
+
+        public static bool IsRcdataElement(string element)
+        {
+            return Is(RcdataElements, element);
+        }
+
+        public static bool IsSpecialElement(string element)
+        {
+            return Is(SpecialElements, element);
         }
 
         public static bool IsScopingElement(string element)
@@ -57,7 +76,17 @@ namespace Twintsam
             return Is(ScopingElements, element);
         }
 
-        private static bool Is(string[] elements, string element)
+        public static bool IsFormattingElement(string element)
+        {
+            return Is(FormattingElements, element);
+        }
+
+        public static bool HasOptionalEndTag(string element)
+        {
+            return Is(ElementsWithOptionalEndTag, element);
+        }
+
+        internal static bool Is(string[] elements, string element)
         {
             return Array.Exists<string>(elements, delegate(string item)
             {

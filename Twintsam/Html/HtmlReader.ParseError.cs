@@ -24,13 +24,17 @@ namespace Twintsam.Html
         protected void OnParseError(string message)
         {
             ParseErrorEventArgs args = new ParseErrorEventArgs(message, this);
+            OnParseError(args);
+        }
 
+        protected void OnParseError(ParseErrorEventArgs args)
+        {
             if (ParseError != null) {
                 ParseError(this, args);
             }
 
             if (IsParseErrorFatal) {
-                _readState = ReadState.Error;
+                //_readState = ReadState.Error;
                 throw new XmlException(args.Message, null, args.LineNumber, args.LinePosition);
             }
         }
