@@ -8,39 +8,19 @@ using System.Text;
 
 namespace Twintsam.Html
 {
-    public class HtmlTextTokenizer : HtmlTokenizer, IXmlLineInfo
+    public sealed class HtmlTextTokenizer : HtmlTokenizer, IXmlLineInfo
     {
-        private class Attribute : IXmlLineInfo
+        internal class Attribute : Twintsam.Html.Attribute
         {
-            public string name;
-            public string value = "";
-            public char quoteChar = ' ';
-
             public bool isDuplicate;
-
-            private bool _hasLineInfo;
-            private int _lineNumber;
-            private int _linePosition;
-
             public Attribute(string name, IXmlLineInfo lineInfo)
                 : this(name, false, lineInfo) { }
 
             public Attribute(string name, bool isDuplicate, IXmlLineInfo lineInfo)
+                : base(name, lineInfo)
             {
-                this.name = name;
-
                 this.isDuplicate = isDuplicate;
-
-                _hasLineInfo = lineInfo.HasLineInfo();
-                _lineNumber = lineInfo.LineNumber;
-                _linePosition = lineInfo.LinePosition;
             }
-
-            #region IXmlLineInfo Members
-            public bool HasLineInfo() { return _hasLineInfo; }
-            public int LineNumber { get { return _lineNumber; } }
-            public int LinePosition { get { return _linePosition; } }
-            #endregion
         }
 
         /// <summary>
@@ -106,7 +86,7 @@ namespace Twintsam.Html
         private XmlNodeType _tokenType;
         private string _name;
         private string _value;
-        private List<Attribute> _attributes = new List<Attribute>();
+        internal List<Attribute> _attributes = new List<Attribute>();
         private bool _trailingSolidus;
         private bool _incorrectDoctype;
 
@@ -284,6 +264,21 @@ namespace Twintsam.Html
                 throw new InvalidOperationException();
             }
             return _attributes[index].value;
+        }
+
+        public override int GetAttributeIndex(string name)
+        {
+            if (_textToken.Length > 0) {
+                return -1;
+            }
+            int index = 0;
+            foreach (Attribute attribute in _attributes) {
+                if (String.Equals(attribute.name, name, StringComparison.OrdinalIgnoreCase)) {
+                    Debug.Assert(attribute.value != null);
+                    return index;
+                }
+            }
+            return -1;
         }
 
         public override string GetAttribute(string name)
@@ -487,7 +482,7 @@ namespace Twintsam.Html
         /// Initialises a new token with the given type.
         /// </summary>
         /// <param name="tokenType">The type of the token, should be on of <see cref="XmlNodeType.DocumentType"/>, <see cref="XmlNodeType.Element"/>, <see cref="XmlNodeType.EndElement"/>, <see cref="XmlNodeType.Text"/>, <see cref="XmlNodeType.Whitespace"/> or <see cref="XmlNodeType.Comment"/></param>
-        protected void InitToken(XmlNodeType newTokenType)
+        private void InitToken(XmlNodeType newTokenType)
         {
             Debug.Assert(newTokenType == XmlNodeType.DocumentType
                 || newTokenType == XmlNodeType.Element
@@ -511,13 +506,13 @@ namespace Twintsam.Html
             _incorrectDoctype = false;
         }
 
-        protected void EmitToken()
+        private void EmitToken()
         {
             Debug.Assert(_tokenState == TokenState.Initialized);
             _tokenState = TokenState.Complete;
         }
 
-        protected void PrepareTextToken(string value)
+        private void PrepareTextToken(string value)
         {
             _tokenState = TokenState.Uninitialized;
             if (_textTokenIsWhitespace && !Constants.IsSpace(value)) {
@@ -525,7 +520,7 @@ namespace Twintsam.Html
             }
             _textToken.Append(value);
         }
-        protected void PrepareTextToken(char value)
+        private void PrepareTextToken(char value)
         {
             _tokenState = TokenState.Uninitialized;
             if (_textTokenIsWhitespace && !Constants.IsSpaceCharacter(value)) {

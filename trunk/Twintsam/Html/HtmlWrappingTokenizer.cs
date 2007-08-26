@@ -103,6 +103,11 @@ namespace Twintsam.Html
             return _tokenizer.GetAttribute(index);
         }
 
+        public override int GetAttributeIndex(string name)
+        {
+            return base.GetAttributeIndex(name);
+        }
+
         public override string GetAttribute(string name)
         {
             return _tokenizer.GetAttribute(name);

@@ -42,21 +42,19 @@
   <ItemGroup>
     <Compile Include="Constants.cs" />
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Html\Attribute.cs" />
     <Compile Include="Html\ContentModel.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Html\HtmlEntities.cs" />
     <Compile Include="Html\HtmlReader.cs" />
     <Compile Include="Html\HtmlReader.ParseError.cs" />
-    <Compile Include="Html\HtmlReader.StreamHandling.cs" />
-    <Compile Include="Html\HtmlReader.Tokenization.cs" />
-    <Compile Include="Html\HtmlReader.Tokenization.Entities.cs" />
-    <Compile Include="Html\HtmlReader.TreeConstruction.cs" />
     <Compile Include="Html\HtmlTextReader.cs" />
     <Compile Include="Html\HtmlTextTokenizer.cs" />
     <Compile Include="Html\HtmlTokenizer.cs" />
     <Compile Include="Html\HtmlWrappingTokenizer.cs" />
     <Compile Include="Html\ParseErrorEventArgs.cs" />
+    <Compile Include="Html\CompatibilityMode.cs" />
     <Compile Include="IO\PreambleDetector.cs" />
     <Compile Include="IO\SeekableReadOnlyStream.cs" />
     <Compile Include="IO\StreamChain.cs" />

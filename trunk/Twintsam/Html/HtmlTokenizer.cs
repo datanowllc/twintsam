@@ -41,15 +41,23 @@ namespace Twintsam.Html
         public abstract string GetAttributeName(int index);
         public virtual char GetAttributeQuoteChar(int index) { return '"'; }
         public abstract string GetAttribute(int index);
-        public virtual string GetAttribute(string name)
+        public virtual int GetAttributeIndex(string name)
         {
             int attributeCount = AttributeCount;
             for (int i = 0; i < attributeCount; i++) {
                 if (String.Equals(GetAttributeName(i), name, StringComparison.OrdinalIgnoreCase)) {
-                    return GetAttribute(i);
+                    return i;
                 }
             }
-            return null;
+            return -1;
+        }
+        public virtual string GetAttribute(string name)
+        {
+            int attributeIndex = GetAttributeIndex(name);
+            if (attributeIndex < 0) {
+                return null;
+            }
+            return GetAttribute(attributeIndex);
         }
         public abstract void Close();
 
