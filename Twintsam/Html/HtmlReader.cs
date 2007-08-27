@@ -44,6 +44,24 @@ namespace Twintsam.Html
                 token.value = String.Empty;
                 return token;
             }
+            public static Token CreateText(string text)
+            {
+                Debug.Assert(!Constants.IsSpaceCharacter(text[0]));
+                Token token = new Token();
+                token.tokenType = XmlNodeType.Text;
+                token.name = String.Empty;
+                token.value = text;
+                return token;
+            }
+            public static Token CreateWhitespace(string whitespace)
+            {
+                Debug.Assert(Constants.IsSpace(whitespace));
+                Token token = new Token();
+                token.tokenType = XmlNodeType.Whitespace;
+                token.name = String.Empty;
+                token.value = whitespace;
+                return token;
+            }
             public static Token CreateFromTokenizer(HtmlTokenizer tokenizer)
             {
                 Token token = new Token();
@@ -110,6 +128,13 @@ namespace Twintsam.Html
             AfterBody,
             InFrameset,
             AfterFrameset,
+        }
+
+        private enum ParsingState
+        {
+            ProcessNextToken,
+            ReprocessCurrentToken,
+            Pause,
         }
 
         public static readonly string[] QuirksModeDoctypePublicIds = {
@@ -196,8 +221,8 @@ namespace Twintsam.Html
 
         private class Tokenizer : HtmlWrappingTokenizer
         {
+            private Stack<Token> _pendingTokens = new Stack<Token>();
             private Token _pendingToken;
-            private bool _pendingTokenActive;
 
             public Tokenizer(HtmlTokenizer tokenizer) : base(tokenizer) { }
 
@@ -205,7 +230,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.attributes.Count;
                     }
                     return base.AttributeCount;
@@ -222,7 +247,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return false;
                     }
                     return base.EOF;
@@ -230,7 +255,7 @@ namespace Twintsam.Html
             }
             public override string GetAttribute(int index)
             {
-                if (_pendingTokenActive && _pendingToken != null) {
+                if (_pendingToken != null) {
                     if (index < 0 || index >= _pendingToken.attributes.Count) {
                         throw new ArgumentOutOfRangeException("index");
                     }
@@ -240,7 +265,7 @@ namespace Twintsam.Html
             }
             public override string GetAttribute(string name)
             {
-                if (_pendingTokenActive && _pendingToken != null) {
+                if (_pendingToken != null) {
                     name = name.ToLowerInvariant();
                     for (int i = 0; i < _pendingToken.attributes.Count; i++) {
                         Attribute attribute = _pendingToken.attributes[i];
@@ -254,7 +279,7 @@ namespace Twintsam.Html
             }
             public override int GetAttributeIndex(string name)
             {
-                if (_pendingTokenActive && _pendingToken != null) {
+                if (_pendingToken != null) {
                     name = name.ToLowerInvariant();
                     for (int i = 0; i < _pendingToken.attributes.Count; i++){
                         if (String.Equals(_pendingToken.attributes[i].name, name, StringComparison.Ordinal)) {
@@ -267,7 +292,7 @@ namespace Twintsam.Html
             }
             public override string GetAttributeName(int index)
             {
-                if (_pendingTokenActive && _pendingToken != null) {
+                if (_pendingToken != null) {
                     if (index < 0 || index >= _pendingToken.attributes.Count) {
                         throw new ArgumentOutOfRangeException("index");
                     }
@@ -277,7 +302,7 @@ namespace Twintsam.Html
             }
             public override char GetAttributeQuoteChar(int index)
             {
-                if (_pendingTokenActive && _pendingToken != null) {
+                if (_pendingToken != null) {
                     if (index < 0 || index >= _pendingToken.attributes.Count) {
                         throw new ArgumentOutOfRangeException("index");
                     }
@@ -289,7 +314,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.attributes.Count > 0;
                     }
                     return base.HasAttributes;
@@ -299,7 +324,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.hasTrailingSolidus;
                     }
                     return base.HasTrailingSolidus;
@@ -309,7 +334,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.isIncorrectDoctype;
                     }
                     return base.IsIncorrectDoctype;
@@ -319,7 +344,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.name;
                     }
                     return base.Name;
@@ -327,14 +352,13 @@ namespace Twintsam.Html
             }
             public override bool Read()
             {
+                if (_pendingTokens.Count > 0) {
+                    _pendingToken = _pendingTokens.Pop();
+                    return true;
+                }
                 if (_pendingToken != null) {
-                    if (_pendingTokenActive) {
-                        _pendingToken = null;
-                        return base.EOF;
-                    } else {
-                        _pendingTokenActive = true;
-                        return true;
-                    }
+                    _pendingToken = null;
+                    return base.EOF;
                 }
                 return base.Read();
             }
@@ -342,7 +366,7 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return ReadState.Interactive;
                     }
                     return base.ReadState;
@@ -366,34 +390,43 @@ namespace Twintsam.Html
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.tokenType;
                     }
                     return base.TokenType;
                 }
             }
-            public override string Value
+            public new string Value
             {
                 get
                 {
-                    if (_pendingTokenActive && _pendingToken != null) {
+                    if (_pendingToken != null) {
                         return _pendingToken.value;
                     }
                     return base.Value;
                 }
             }
 
-            internal void SetToken(Token token)
+            internal void PushToken(Token token)
             {
+                Debug.Assert(token != null);
                 if (_pendingToken != null) {
-                    throw new InvalidOperationException();
+                    _pendingTokens.Push(_pendingToken);
                 }
                 _pendingToken = token;
-                _pendingTokenActive = false;
+            }
+            internal void ReplaceToken(Token token)
+            {
+                Debug.Assert(token != null);
+                if (_pendingToken == null && _pendingTokens.Count == 0) {
+                    base.Read();
+                }
+                _pendingToken = token;
             }
         }
 
         private Tokenizer _tokenizer;
+        private bool _reprocessToken;
         private IXmlLineInfo _lineInfo;
         private TreeConstructionPhase _phase;
         private InsertionMode _insertionMode;
@@ -489,11 +522,13 @@ namespace Twintsam.Html
         {
             Debug.Assert(omitted == null || String.Equals(omitted, omitted.ToLowerInvariant(), StringComparison.Ordinal));
 
-            string element = _openElements.Peek().name;
-            if ((omitted == null || String.Equals(element, omitted, StringComparison.Ordinal))
-                && Constants.HasOptionalEndTag(element)) {
-                _tokenizer.SetToken(Token.CreateEndTag(element));
-                return true;
+            if (_openElements.Count > 0) {
+                string element = _openElements.Peek().name;
+                if ((omitted == null || String.Equals(element, omitted, StringComparison.Ordinal))
+                    && Constants.HasOptionalEndTag(element)) {
+                    _tokenizer.PushToken(Token.CreateEndTag(element));
+                    return true;
+                }
             }
             return false;
         }
@@ -653,7 +688,11 @@ namespace Twintsam.Html
 
         public override int Depth
         {
-            get { throw new NotImplementedException(); }
+            get
+            {
+                // TODO: Depth
+                return 0;
+            }
         }
 
         public override string GetAttribute(int i)
@@ -764,7 +803,7 @@ namespace Twintsam.Html
         {
             int attributeIndex = _attributeIndex;
             _attributeIndex = -1;
-            if (AttributeCount > 0) {
+            if (AttributeCount <= 0) {
                 _attributeIndex = attributeIndex;
                 return false;
             }
@@ -814,27 +853,53 @@ namespace Twintsam.Html
                     return true;
                 }
             }
-            bool newToken = false;
-            while (!newToken && _tokenizer.Read()) {
+            if (_tokenizer.EOF) {
+                return false;
+            }
+            if (!_tokenizer.Read()) {
+                return ProcessEndOfFile();
+            }
+            ParsingState parsingState;
+            do {
                 switch (_phase) {
                 case TreeConstructionPhase.Initial:
-                    newToken = ParseInitial();
+                    parsingState = ParseInitial();
                     break;
                 case TreeConstructionPhase.Root:
-                    newToken = ParseRoot();
+                    parsingState = ParseRoot();
                     break;
                 case TreeConstructionPhase.Main:
-                    throw new NotImplementedException();
+                    parsingState = ParseMain();
+                    break;
                 case TreeConstructionPhase.TrailingEnd:
                     throw new NotImplementedException();
                 default:
                     throw new InvalidOperationException();
                 }
-            }
-            if (EOF) {
-                return ProcessEndOfFile();
-            }
+                if (parsingState == ParsingState.ProcessNextToken) {
+                    if (!_tokenizer.Read()) {
+                        return ProcessEndOfFile();
+                    }
+                }
+            } while (parsingState != ParsingState.Pause);
+
             return true;
+        }
+
+        private string ExtractLeadingWhitespace()
+        {
+            Debug.Assert(_tokenizer.TokenType == XmlNodeType.Text);
+            string nonWhitespace = _tokenizer.Value.TrimStart(Constants.SpaceCharacters.ToCharArray());
+            string whitespace = _tokenizer.Value.Substring(0, _tokenizer.Value.Length - nonWhitespace.Length);
+            if (nonWhitespace.Length > 0) {
+                _tokenizer.ReplaceToken(Token.CreateText(nonWhitespace));
+            }
+            return whitespace;
+        }
+        private void ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token token)
+        {
+            _tokenizer.PushToken(token);
+            _reprocessToken = true;
         }
 
         private bool ProcessEndOfFile()
@@ -852,11 +917,15 @@ namespace Twintsam.Html
                 goto case TreeConstructionPhase.Main;
             case TreeConstructionPhase.Main:
                 bool generated = GenerateImpliedEndTags(null);
-                if (_openElements.Count > 2
-                    || (_openElements.Count == 2
-                        && String.Equals(_openElements.Peek().name, "body", StringComparison.Ordinal))) {
-                    OnParseError("???");
+                if (_openElements.Count > 2){
+                    OnParseError("Unexpected end of stream. Missing closing tags.");
+                } else if (_openElements.Count == 2
+                    && String.Equals(_openElements.Peek().name, "body", StringComparison.Ordinal)) {
+                    OnParseError(
+                        String.Concat("Unexpected end of stream. Expected end tag (",
+                            _openElements.Peek().name, ") first."));
                 }
+                // TODO: fragment case
                 return generated;
             case TreeConstructionPhase.TrailingEnd:
                 return false; // Nothing to do
@@ -865,13 +934,14 @@ namespace Twintsam.Html
             }
         }
 
-        private bool ParseInitial()
+        private ParsingState ParseInitial()
         {
             switch (_tokenizer.TokenType) {
             case XmlNodeType.Whitespace:
-                return false;
+                return ParsingState.ProcessNextToken;
             case XmlNodeType.Comment:
-                return true;
+                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                return ParsingState.Pause;
             case XmlNodeType.DocumentType:
                 if (!String.Equals(_tokenizer.Name, "HTML", StringComparison.OrdinalIgnoreCase)) {
                     OnParseError("DOCTYPE name is not HTML (case-insitive)");
@@ -899,36 +969,135 @@ namespace Twintsam.Html
                     _compatMode = CompatibilityMode.QuirksMode;
                 }
                 _phase = TreeConstructionPhase.Root;
-                return true;
+                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                return ParsingState.Pause;
             case XmlNodeType.Element:
             case XmlNodeType.EndElement:
             case XmlNodeType.Text:
-                OnParseError("Unexpected end of stream in initial phase");
+                OnParseError("Unexpected non-space characters. Expected DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
                 _phase = TreeConstructionPhase.Root;
-                return false;
+                return ParsingState.ReprocessCurrentToken;
             default:
                 throw new InvalidOperationException();
             }
         }
 
-        private bool ParseRoot()
+        private ParsingState ParseRoot()
         {
             switch (_tokenizer.TokenType) {
             case XmlNodeType.DocumentType:
                 OnParseError("Misplaced or duplicate DOCTYPE. Ignored.");
-                return false;
+                return ParsingState.ProcessNextToken;
             case XmlNodeType.Comment:
-                return true;
+                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                return ParsingState.Pause;
             case XmlNodeType.Whitespace:
-                return false; // Ignore the token
+                return ParsingState.ProcessNextToken;
             case XmlNodeType.Text:
+                _phase = TreeConstructionPhase.Main;
+                ExtractLeadingWhitespace(); // ignore returned whitespace, because whitespace is ignore in this phase (see above)
+                goto case XmlNodeType.EndElement;
+            case XmlNodeType.Element:
+                if (String.Equals(_tokenizer.Name, "html", StringComparison.Ordinal)) {
+                    // XXX: instead of creating an "html" node and then copying the attributes in the main phase, we just use directly the current "html" start tag token
+                    _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                    _openElements.Push(Token.CreateFromTokenizer(_tokenizer));
+                    _phase = TreeConstructionPhase.Main;
+                    return ParsingState.Pause;
+                } else {
+                    goto case XmlNodeType.EndElement;
+                }
+            case XmlNodeType.EndElement:
+                Token htmlToken = Token.CreateStartTag("html");
+                _pendingOutputTokens.Enqueue(htmlToken);
+                _openElements.Push(htmlToken);
+                _phase = TreeConstructionPhase.Main;
+                return ParsingState.ReprocessCurrentToken;
+            default:
+                throw new InvalidOperationException();
+            }
+        }
+
+        private ParsingState ParseMain()
+        {
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.DocumentType:
+                OnParseError("Unexpected DOCTYPE. Ignored");
+                return ParsingState.ProcessNextToken;
             case XmlNodeType.Element:
             case XmlNodeType.EndElement:
-                // XXX: attributes?
-                _pendingOutputTokens.Enqueue(Token.CreateStartTag("html"));
-                _phase = TreeConstructionPhase.Main;
-                return true;
+            case XmlNodeType.Comment:
+            case XmlNodeType.Text:
+            case XmlNodeType.Whitespace:
+                switch (_insertionMode) {
+                case InsertionMode.BeforeHead:
+                    return ParseMainBeforeHead();
+                case InsertionMode.InHead:
+                case InsertionMode.InHeadNoScript:
+                case InsertionMode.AfterHead:
+                case InsertionMode.InBody:
+                case InsertionMode.InTable:
+                case InsertionMode.InCaption:
+                case InsertionMode.InColumnGroup:
+                case InsertionMode.InTableBody:
+                case InsertionMode.InRow:
+                case InsertionMode.InCell:
+                case InsertionMode.InSelect:
+                case InsertionMode.AfterBody:
+                case InsertionMode.InFrameset:
+                case InsertionMode.AfterFrameset:
+                    throw new NotImplementedException();
+                default:
+                    throw new InvalidOperationException();
+                }
+            default:
+                throw new InvalidOperationException();
+            }
+        }
+
+        private ParsingState ParseMainBeforeHead()
+        {
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                return ParsingState.Pause;
+            case XmlNodeType.Text:
+                string whitespace = ExtractLeadingWhitespace();
+                _tokenizer.PushToken(Token.CreateStartTag("head"));
+                if (whitespace.Length > 0) {
+                    _tokenizer.PushToken(Token.CreateWhitespace(whitespace));
+                    goto case XmlNodeType.Whitespace;
+                } else {
+                    return ParsingState.ReprocessCurrentToken;
+                }
+            case XmlNodeType.Comment:
+                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                return ParsingState.Pause;
+            case XmlNodeType.Element:
+                if (_tokenizer.Name == "head") {
+                    Token token = Token.CreateFromTokenizer(_tokenizer);
+                    _pendingOutputTokens.Enqueue(token);
+                    _openElements.Push(token);
+                    _insertionMode = InsertionMode.InHead;
+                    return ParsingState.Pause;
+                } else {
+                    ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
+                    return ParsingState.ProcessNextToken;
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "head":
+                case "html":
+                case "body":
+                case "p":
+                case "br":
+                    ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
+                    return ParsingState.ProcessNextToken;
+                default:
+                    OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                    return ParsingState.ProcessNextToken;
+                }
             default:
                 throw new InvalidOperationException();
             }
