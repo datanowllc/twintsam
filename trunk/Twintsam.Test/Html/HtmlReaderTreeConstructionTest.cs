@@ -33,42 +33,67 @@ namespace Twintsam.Html
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
-            while (reader.Read()) {
-                actualOutput.Append("| ");
-                actualOutput.Append(' ', (reader.Depth - 1) * 2);
-
-                switch (reader.NodeType) {
-                case XmlNodeType.DocumentType:
-                    actualOutput.Append("<!DOCTYPE ").Append(reader.Name).Append('>');
-                    break;
-                case XmlNodeType.Element:
-                    actualOutput.Append("<").Append(reader.Name).Append('>');
-                    while (reader.MoveToFirstAttribute()) {
-                        actualOutput.AppendLine();
-                        actualOutput.Append("| ");
-                        actualOutput.Append(' ', (reader.Depth - 1) * 2);
-                     
-                        actualOutput.Append(reader.Name).Append("=\"").Append(reader.Value.Replace("\"", "&quot;")).Append('"');
+            try {
+                while (reader.Read()) {
+                    actualOutput.Append("| ");
+                    if (reader.Depth > 0) {
+                        actualOutput.Append(' ', reader.Depth * 2);
                     }
-                    break;
-                case XmlNodeType.EndElement:
-                    break;
-                case XmlNodeType.Comment:
-                    actualOutput.Append("<!-- ").Append(reader.Value).Append(" -->");
-                    break;
-                case XmlNodeType.Text:
-                    actualOutput.Append('"').Append(reader.Value.Replace("\"", "&quot;")).Append('"');
-                    break;
-                default:
-                    Assert.Fail("Unexpected token type: {0}", reader.NodeType);
-                    break;
+
+                    switch (reader.NodeType) {
+                    case XmlNodeType.DocumentType:
+                        actualOutput.Append("<!DOCTYPE");
+                        //if (reader.Name.Length > 0) {
+                        actualOutput.Append(' ').Append(reader.Name);
+                        //}
+                        //string publicId = reader.GetAttribute("PUBLIC");
+                        //string systemId = reader.GetAttribute("SYSTEM");
+                        //if (publicId != null) {
+                        //    actualOutput.Append("PUBLIC ")
+                        //    .Append('"').Append(publicId).Append('"');
+                        //} else if (systemId != null) {
+                        //    actualOutput.Append("SYSTEM");
+                        //}
+                        //if (systemId != null) {
+                        //    actualOutput.Append(' ').Append('"').Append(systemId).Append('"');
+                        //}
+                        actualOutput.Append('>');
+                        break;
+                    case XmlNodeType.Element:
+                        actualOutput.Append("<").Append(reader.Name).Append('>');
+                        while (reader.MoveToNextAttribute()) {
+                            actualOutput.AppendLine();
+                            actualOutput.Append("| ");
+                            actualOutput.Append(' ', (reader.Depth - 1) * 2);
+
+                            actualOutput.Append(reader.Name).Append("=\"").Append(reader.Value.Replace("\"", "&quot;")).Append('"');
+                        }
+                        break;
+                    case XmlNodeType.EndElement:
+                        break;
+                    case XmlNodeType.Comment:
+                        actualOutput.Append("<!-- ").Append(reader.Value).Append(" -->");
+                        break;
+                    case XmlNodeType.Text:
+                        actualOutput.Append('"').Append(reader.Value.Replace("\"", "&quot;")).Append('"');
+                        break;
+                    default:
+                        Assert.Fail("Unexpected token type: {0}", reader.NodeType);
+                        break;
+                    }
+
+                    actualOutput.AppendLine();
                 }
-
-                actualOutput.AppendLine();
+                Assert.AreEqual(
+                    expectedOutput.Replace("\r\n", "\n"),
+                    actualOutput.Replace("\r\n", "\n").ToString());
+                Assert.AreEqual(parseErrors, this.parseErrors);
+            } catch (NotImplementedException) {
+                // Amnesty for those that confess
+#if !NUNIT
+                Assert.Inconclusive("Not Implemented");
+#endif
             }
-
-            Assert.AreEqual(expectedOutput, actualOutput.ToString());
-            Assert.AreEqual(parseErrors, this.parseErrors);
         }
 
         [TestInitialize]
