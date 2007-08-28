@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using System.Diagnostics;
+using System.Text;
+using System.Collections.Specialized;
 
 namespace Twintsam.Html
 {
@@ -62,34 +64,6 @@ namespace Twintsam.Html
                 token.value = whitespace;
                 return token;
             }
-            public static Token CreateFromTokenizer(HtmlTokenizer tokenizer)
-            {
-                Token token = new Token();
-                token.tokenType = tokenizer.TokenType;
-                token.name = tokenizer.Name;
-                token.value = tokenizer.Value;
-                token.isIncorrectDoctype = tokenizer.IsIncorrectDoctype;
-                token.hasTrailingSolidus = tokenizer.HasTrailingSolidus;
-                HtmlTextTokenizer textTokenizer = tokenizer as HtmlTextTokenizer;
-                if (textTokenizer != null) {
-                    token.attributes.AddRange(textTokenizer._attributes.ConvertAll<Attribute>(
-                        delegate(HtmlTextTokenizer.Attribute attribute) {
-                            return attribute;
-                        }));
-                } else {
-                    for (int i = 0; i < tokenizer.AttributeCount; i++) {
-                        token.attributes.Add(CreateAttributeFromTokenizer(tokenizer, i));
-                    }
-                }
-                return token;
-            }
-            private static Attribute CreateAttributeFromTokenizer(HtmlTokenizer tokenizer, int i)
-            {
-                Attribute attribute = new Attribute(tokenizer.GetAttributeName(i), tokenizer as IXmlLineInfo);
-                attribute.value = tokenizer.GetAttribute(i);
-                attribute.quoteChar = tokenizer.GetAttributeQuoteChar(i);
-                return attribute;
-            }
 
             #region ICloneable Membres
 
@@ -115,7 +89,7 @@ namespace Twintsam.Html
         {
             BeforeHead,
             InHead,
-            InHeadNoScript,
+            InHeadNoscript,
             AfterHead,
             InBody,
             InTable,
@@ -407,6 +381,38 @@ namespace Twintsam.Html
                 }
             }
 
+            internal Token Token
+            {
+                get
+                {
+                    if (_pendingToken != null) {
+                        return _pendingToken;
+                    }
+                    Token token = new Token();
+                    token.tokenType = Tokenizer.TokenType;
+                    token.name = Tokenizer.Name;
+                    token.value = Tokenizer.Value;
+                    token.isIncorrectDoctype = Tokenizer.IsIncorrectDoctype;
+                    token.hasTrailingSolidus = Tokenizer.HasTrailingSolidus;
+                    HtmlTextTokenizer textTokenizer = Tokenizer as HtmlTextTokenizer;
+                    if (textTokenizer != null) {
+                        token.attributes.AddRange(textTokenizer._attributes.ConvertAll<Attribute>(
+                            delegate(HtmlTextTokenizer.Attribute attribute)
+                            {
+                                return attribute;
+                            }));
+                    } else {
+                        for (int i = 0; i < Tokenizer.AttributeCount; i++) {
+                            Attribute attribute = new Attribute(Tokenizer.GetAttributeName(i), Tokenizer as IXmlLineInfo);
+                            attribute.value = Tokenizer.GetAttribute(i);
+                            attribute.quoteChar = Tokenizer.GetAttributeQuoteChar(i);
+                            token.attributes.Add(attribute);
+                        }
+                    }
+                    ReplaceToken(token);
+                    return token;
+                }
+            }
             internal void PushToken(Token token)
             {
                 Debug.Assert(token != null);
@@ -426,7 +432,6 @@ namespace Twintsam.Html
         }
 
         private Tokenizer _tokenizer;
-        private bool _reprocessToken;
         private IXmlLineInfo _lineInfo;
         private TreeConstructionPhase _phase;
         private InsertionMode _insertionMode;
@@ -490,22 +495,37 @@ namespace Twintsam.Html
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#list-of4
         private Stack<LinkedList<Token>> _activeFormattingElements = new Stack<LinkedList<Token>>();
 
+        private Token ElementInActiveFormattingElements(string name)
+        {
+            for (LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
+                element != null; element = element.Previous) {
+                Debug.Assert(element.Value != null);
+                if (element.Value.name == name) {
+                    return element.Value;
+                }
+            }
+            return null;
+        }
+
         private void ReconstructActiveFormattingElements()
         {
-            LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
-            if (element != null){
-                if (element.Value != null && _openElements.Contains(element.Value)) {
-                    while (element.Previous != null) {
-                        element = element.Previous;
-                        if (element.Value == null || _openElements.Contains(element.Value)) {
-                            element = element.Next;
-                            break;
+            if (_activeFormattingElements.Count > 0) {
+                LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
+                if (element != null) {
+                    Debug.Assert(element.Value != null);
+                    if (_openElements.Contains(element.Value)) {
+                        while (element.Previous != null) {
+                            element = element.Previous;
+                            if (_openElements.Contains(element.Value)) {
+                                element = element.Next;
+                                break;
+                            }
                         }
+                        do {
+                            _pendingOutputTokens.Enqueue(element.Value);
+                            element = element.Next;
+                        } while (element != null);
                     }
-                    do {
-                        _pendingOutputTokens.Enqueue(element.Value);
-                        element = element.Next;
-                    } while (element != null);
                 }
             }
         }
@@ -513,6 +533,21 @@ namespace Twintsam.Html
         private void ClearActiveFormattingElements()
         {
             _activeFormattingElements.Pop();
+        }
+        #endregion
+
+        #region 8.2.4.3.3 Creating and inserting HTML elements
+        private ParsingState InsertHtmlElement()
+        {
+            InsertHtmlElement(_tokenizer.Token);
+            return ParsingState.Pause;
+        }
+        private void InsertHtmlElement(Token token)
+        {
+            Debug.Assert(token != null && token.tokenType == XmlNodeType.Element);
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
+            _pendingOutputTokens.Enqueue(token);
+            _openElements.Push(token);
         }
         #endregion
 
@@ -889,33 +924,38 @@ namespace Twintsam.Html
         private string ExtractLeadingWhitespace()
         {
             Debug.Assert(_tokenizer.TokenType == XmlNodeType.Text);
-            string nonWhitespace = _tokenizer.Value.TrimStart(Constants.SpaceCharacters.ToCharArray());
-            string whitespace = _tokenizer.Value.Substring(0, _tokenizer.Value.Length - nonWhitespace.Length);
-            if (nonWhitespace.Length > 0) {
+            string value = _tokenizer.Value;
+            if (Constants.IsSpaceCharacter(value[0])) {
+                string nonWhitespace = _tokenizer.Value.TrimStart(Constants.SpaceCharacters.ToCharArray());
+                string whitespace = _tokenizer.Value.Substring(0, _tokenizer.Value.Length - nonWhitespace.Length);
                 _tokenizer.ReplaceToken(Token.CreateText(nonWhitespace));
+                return whitespace;
+            } else {
+                return String.Empty;
             }
-            return whitespace;
         }
-        private void ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token token)
+        private ParsingState ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token token)
         {
             _tokenizer.PushToken(token);
-            _reprocessToken = true;
+            return ParsingState.ReprocessCurrentToken;
         }
 
         private bool ProcessEndOfFile()
         {
             switch (_phase) {
             case TreeConstructionPhase.Initial:
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-initial0
                 OnParseError("Unexpected end of stream. Expected DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
                 goto case TreeConstructionPhase.Root;
             case TreeConstructionPhase.Root:
-                Token token = Token.CreateStartTag("html");
-                _pendingOutputTokens.Enqueue(token);
-                _openElements.Push(token);
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-root1
+                // XXX: that's not exactly what the spec says, but it has an equivalent result.
+                InsertHtmlElement(Token.CreateStartTag("html"));
                 _phase = TreeConstructionPhase.Main;
                 goto case TreeConstructionPhase.Main;
             case TreeConstructionPhase.Main:
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-main0
                 bool generated = GenerateImpliedEndTags(null);
                 if (_openElements.Count > 2){
                     OnParseError("Unexpected end of stream. Missing closing tags.");
@@ -936,11 +976,12 @@ namespace Twintsam.Html
 
         private ParsingState ParseInitial()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-initial0
             switch (_tokenizer.TokenType) {
             case XmlNodeType.Whitespace:
                 return ParsingState.ProcessNextToken;
             case XmlNodeType.Comment:
-                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
                 return ParsingState.Pause;
             case XmlNodeType.DocumentType:
                 if (!String.Equals(_tokenizer.Name, "HTML", StringComparison.OrdinalIgnoreCase)) {
@@ -969,7 +1010,7 @@ namespace Twintsam.Html
                     _compatMode = CompatibilityMode.QuirksMode;
                 }
                 _phase = TreeConstructionPhase.Root;
-                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
                 return ParsingState.Pause;
             case XmlNodeType.Element:
             case XmlNodeType.EndElement:
@@ -985,12 +1026,13 @@ namespace Twintsam.Html
 
         private ParsingState ParseRoot()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-root1
             switch (_tokenizer.TokenType) {
             case XmlNodeType.DocumentType:
                 OnParseError("Misplaced or duplicate DOCTYPE. Ignored.");
                 return ParsingState.ProcessNextToken;
             case XmlNodeType.Comment:
-                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
                 return ParsingState.Pause;
             case XmlNodeType.Whitespace:
                 return ParsingState.ProcessNextToken;
@@ -1000,18 +1042,14 @@ namespace Twintsam.Html
                 goto case XmlNodeType.EndElement;
             case XmlNodeType.Element:
                 if (String.Equals(_tokenizer.Name, "html", StringComparison.Ordinal)) {
-                    // XXX: instead of creating an "html" node and then copying the attributes in the main phase, we just use directly the current "html" start tag token
-                    _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
-                    _openElements.Push(Token.CreateFromTokenizer(_tokenizer));
                     _phase = TreeConstructionPhase.Main;
-                    return ParsingState.Pause;
+                    // XXX: instead of creating an "html" node and then copying the attributes in the main phase, we just use directly the current "html" start tag token
+                    return InsertHtmlElement();
                 } else {
                     goto case XmlNodeType.EndElement;
                 }
             case XmlNodeType.EndElement:
-                Token htmlToken = Token.CreateStartTag("html");
-                _pendingOutputTokens.Enqueue(htmlToken);
-                _openElements.Push(htmlToken);
+                InsertHtmlElement(Token.CreateStartTag("html"));
                 _phase = TreeConstructionPhase.Main;
                 return ParsingState.ReprocessCurrentToken;
             default:
@@ -1021,6 +1059,7 @@ namespace Twintsam.Html
 
         private ParsingState ParseMain()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#how-to0
             switch (_tokenizer.TokenType) {
             case XmlNodeType.DocumentType:
                 OnParseError("Unexpected DOCTYPE. Ignored");
@@ -1034,9 +1073,13 @@ namespace Twintsam.Html
                 case InsertionMode.BeforeHead:
                     return ParseMainBeforeHead();
                 case InsertionMode.InHead:
-                case InsertionMode.InHeadNoScript:
+                    return ParseMainInHead();
+                case InsertionMode.InHeadNoscript:
+                    return ParseMainInHeadNoscript();
                 case InsertionMode.AfterHead:
+                    return ParseMainAfterHead();
                 case InsertionMode.InBody:
+                    return ParseMainInBody();
                 case InsertionMode.InTable:
                 case InsertionMode.InCaption:
                 case InsertionMode.InColumnGroup:
@@ -1058,9 +1101,11 @@ namespace Twintsam.Html
 
         private ParsingState ParseMainBeforeHead()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#before4
             switch (_tokenizer.TokenType) {
             case XmlNodeType.Whitespace:
-                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
+            case XmlNodeType.Comment:
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
                 return ParsingState.Pause;
             case XmlNodeType.Text:
                 string whitespace = ExtractLeadingWhitespace();
@@ -1071,19 +1116,12 @@ namespace Twintsam.Html
                 } else {
                     return ParsingState.ReprocessCurrentToken;
                 }
-            case XmlNodeType.Comment:
-                _pendingOutputTokens.Enqueue(Token.CreateFromTokenizer(_tokenizer));
-                return ParsingState.Pause;
             case XmlNodeType.Element:
                 if (_tokenizer.Name == "head") {
-                    Token token = Token.CreateFromTokenizer(_tokenizer);
-                    _pendingOutputTokens.Enqueue(token);
-                    _openElements.Push(token);
                     _insertionMode = InsertionMode.InHead;
-                    return ParsingState.Pause;
+                    return InsertHtmlElement();
                 } else {
-                    ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
-                    return ParsingState.ProcessNextToken;
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
                 }
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
@@ -1092,12 +1130,372 @@ namespace Twintsam.Html
                 case "body":
                 case "p":
                 case "br":
-                    ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
-                    return ParsingState.ProcessNextToken;
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
                 default:
                     OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                     return ParsingState.ProcessNextToken;
                 }
+            default:
+                throw new InvalidOperationException();
+            }
+        }
+
+        private ParsingState ParseMainInHead()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#parsing-main-inhead
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
+                return ParsingState.Pause;
+            case XmlNodeType.Text:
+                string whitespace = ExtractLeadingWhitespace();
+                if (whitespace.Length > 0) {
+                    _tokenizer.PushToken(Token.CreateWhitespace(whitespace));
+                    goto case XmlNodeType.Whitespace;
+                } else {
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("head"));
+                }
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "base":
+                case "link":
+                    return InsertHtmlElement();
+                case "meta":
+                    // TODO: change charset if needed
+                    return InsertHtmlElement();
+                case "title":
+                    // FIXME: that's not what the spec says
+                    _tokenizer.ContentModel = ContentModel.Rcdata;
+                    return InsertHtmlElement();
+                case "noscript":
+                    // TODO: case when scripting is enabled:
+                    //if (_scriptingElabled)
+                    //{
+                    //    goto case "style";
+                    //}
+                    // FIXME: that's not what the spec says
+                    _insertionMode = InsertionMode.InHeadNoscript;
+                    return InsertHtmlElement();
+                case "style":
+                    // FIXME: that's not what the spec says
+                    _tokenizer.ContentModel = ContentModel.Cdata;
+                    return InsertHtmlElement();
+                case "script":
+                    // FIXME: that's not what the spec says
+                    _tokenizer.ContentModel = ContentModel.Cdata;
+                    // TODO: script execution
+                    return InsertHtmlElement();
+                case "head":
+                    OnParseError("Unexpected HEAD start tag. Ignored.");
+                    return ParsingState.ProcessNextToken;
+                default:
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("head"));
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "head":
+#if DEBUG
+                    Debug.Assert(_openElements.Pop().name == "head");
+#else
+                    _openElements.Pop();
+#endif
+                    // XXX: we don't emit the head end tag, we'll emit it later before switching to the "in body" insertion mode
+                    _insertionMode = InsertionMode.AfterHead;
+                    return ParsingState.ProcessNextToken;
+                case "body":
+                case "html":
+                case "p":
+                case "br":
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("head"));
+                default:
+                    OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                    return ParsingState.ProcessNextToken;
+                }
+            default:
+                throw new InvalidOperationException();
+            }
+        }
+
+        private ParsingState ParseMainInHeadNoscript()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-head0
+            throw new NotImplementedException();
+        }
+
+        private ParsingState ParseMainAfterHead()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#after3
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
+                return ParsingState.Pause;
+            case XmlNodeType.Text:
+                string whitespace = ExtractLeadingWhitespace();
+                if (whitespace.Length > 0) {
+                    _tokenizer.PushToken(Token.CreateWhitespace(whitespace));
+                    goto case XmlNodeType.Whitespace;
+                } else {
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("body"));
+                }
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "body":
+                    // XXX: that's where we emit the head end tag
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag("head"));
+                    _insertionMode = InsertionMode.InBody;
+                    return InsertHtmlElement();
+                case "frameset":
+                    // XXX: that's where we emit the head end tag
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag("head"));
+                    _insertionMode = InsertionMode.InFrameset;
+                    return InsertHtmlElement();
+                case "base":
+                case "link":
+                case "meta":
+                case "script":
+                case "style":
+                case "title":
+                    OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Should be in head."));
+                    // TODO: reprocess as if "in head"
+                    return ParseMainInHead();
+                default:
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("body"));
+                }
+            case XmlNodeType.EndElement:
+                return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("body"));
+            default:
+                throw new InvalidOperationException();
+            }
+        }
+
+        private ParsingState ParseMainInBody()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-body
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Text:
+                ReconstructActiveFormattingElements();
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
+                return ParsingState.Pause;
+            case XmlNodeType.Comment:
+                _pendingOutputTokens.Enqueue(_tokenizer.Token);
+                return ParsingState.Pause;
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "base":
+                case "link":
+                case "meta":
+                case "script":
+                case "style":
+                    // TODO: reprocess as if "in head"
+                    return ParseMainInHead();
+                case "title":
+                    OnParseError("Unexpected title start tag in body.");
+                    // TODO: reprocess as if "in head"
+                    return ParseMainInHead();
+                case "body":
+                    // TODO: fragment case
+                    if (_tokenizer.HasAttributes) {
+                        OnParseError("Unexpected body start tag in body. NOT ignored because of attributes.");
+                        return InsertHtmlElement();
+                    } else {
+                        OnParseError("Unexpected body start tag in body. Ignored (no attribute).");
+                        return ParsingState.ProcessNextToken;
+                    }
+                case "address":
+                case "blockquote":
+                case "center":
+                case "dir":
+                case "div":
+                case "dl":
+                case "fieldset":
+                case "listing":
+                case "menu":
+                case "ol":
+                case "p":
+                case "ul":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+                        return InsertHtmlElement();
+                    }
+                case "pre":
+                    // FIXME: don't micromanage "<pre>\n", treat as a above for now (don't now it this actually needs fixing or if it'll be handle at the "real tree construction stage")
+                    goto case "p";
+                case "form":
+                    // XXX: no "form element pointer", so no ParseError (will be handle at the "real tree construction stage")
+                    goto case "p";
+                case "li":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                case "dd":
+                case "dt":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+                        throw new NotImplementedException();
+                    }
+                case "plaintext":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+                        _tokenizer.ContentModel = ContentModel.PlainText;
+                        return InsertHtmlElement();
+                    }
+                case "h1":
+                case "h2":
+                case "h3":
+                case "h4":
+                case "h5":
+                case "h6":
+                    goto case "p";
+                case "a":
+                    Token a = ElementInActiveFormattingElements("a");
+                    if (a != null) {
+                        OnParseError("Unexpected start tag (a) implies end tag (a)");
+                        // TODO: act as if an "a" end tag had been seen then remove 'a' from _openElements and _activeFormattingElements.Peek().
+                        throw new NotImplementedException();
+                    }
+                    ReconstructActiveFormattingElements();
+                    _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
+                    return InsertHtmlElement();
+                case "b":
+                case "big":
+                case "em":
+                case "font":
+                case "i":
+                case "s":
+                case "small":
+                case "strike":
+                case "strong":
+                case "tt":
+                case "u":
+                    ReconstructActiveFormattingElements();
+                    _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
+                    return InsertHtmlElement();
+                case "nobr":
+                    ReconstructActiveFormattingElements();
+                    if (ElementInActiveFormattingElements("nobr") != null) {
+                        OnParseError("Unexpected start tag (nobr) implies end tag (nobr)");
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("nobr"));
+                    }
+                    _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
+                    return InsertHtmlElement();
+                case "button":
+                    if (IsInScope("button", false)) {
+                        OnParseError("Unexpected end tag (button) implies end tag (button)");
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("button"));
+                    }
+                    ReconstructActiveFormattingElements();
+                    _activeFormattingElements.Push(new LinkedList<Token>());
+                    return InsertHtmlElement();
+                case "marquee":
+                case "object":
+                    ReconstructActiveFormattingElements();
+                    _activeFormattingElements.Push(new LinkedList<Token>());
+                    return InsertHtmlElement();
+                case "xmp":
+                    ReconstructActiveFormattingElements();
+                    // FIXME: that's not what the spec says
+                    _tokenizer.ContentModel = ContentModel.Cdata;
+                    return InsertHtmlElement();
+                case "table":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+                        _insertionMode = InsertionMode.InTable;
+                        return InsertHtmlElement();
+                    }
+                case "area":
+                case "basefont":
+                case "bgsound":
+                case "br":
+                case "embed":
+                case "img":
+                case "param":
+                case "spacer":
+                case "wbr":
+                    ReconstructActiveFormattingElements();
+#if DEBUG
+                    Debug.Assert(_openElements.Pop().name == _tokenizer.Name);
+#else
+                    _openElements.Pop();
+#endif
+                    return InsertHtmlElement();
+                case "hr":
+                    if (IsInScope("p", false)) {
+                        // XXX: that's not what the spec says but it has the same result
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
+                    } else {
+#if DEBUG
+                        Debug.Assert(_openElements.Pop().name == _tokenizer.Name);
+#else
+                    _openElements.Pop();
+#endif
+                        return InsertHtmlElement();
+                    }
+                case "image":
+                    OnParseError("Unexpected start tag (image). Treated as img.");
+                    Token token = _tokenizer.Token;
+                    token.name = "img";
+                    _tokenizer.ReplaceToken(token);
+                    return ParsingState.ReprocessCurrentToken;
+                case "input":
+                    throw new NotImplementedException();
+                case "isindex":
+                    throw new NotImplementedException();
+                case "textarea":
+                    throw new NotImplementedException();
+                case "iframe":
+                case "noembed":
+                case "noframe":
+                    throw new NotImplementedException();
+                case "noscript":
+                    // TODO: case when scripting is enabled
+                    throw new NotImplementedException();
+                case "select":
+                    throw new NotImplementedException();
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "frame":
+                case "frameset":
+                case "head":
+                case "option":
+                case "optgroup":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                    throw new NotImplementedException();
+                case "event-source":
+                case "section":
+                case "nav":
+                case "article":
+                case "aside":
+                case "header":
+                case "footer":
+                case "datagrid":
+                case "command":
+                    throw new NotImplementedException();
+                default:
+                    ReconstructActiveFormattingElements();
+                    return InsertHtmlElement();
+                }
+            case XmlNodeType.EndElement:
+                throw new NotImplementedException();
             default:
                 throw new InvalidOperationException();
             }
