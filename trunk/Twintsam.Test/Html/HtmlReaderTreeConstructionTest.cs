@@ -14,6 +14,7 @@ using System;
 using System.Text;
 using System.IO;
 using System.Xml;
+using System.Diagnostics;
 
 namespace Twintsam.Html
 {
@@ -32,6 +33,12 @@ namespace Twintsam.Html
             HtmlReader reader = new HtmlReader(new StringReader(input));
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
+            Trace.WriteLine("Input:");
+            Trace.WriteLine(input);
+            Trace.WriteLine("");
+            Trace.WriteLine("Expected:");
+            Trace.WriteLine(expectedOutput);
+            Trace.WriteLine("");
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
             try {
                 while (reader.Read()) {
@@ -88,11 +95,16 @@ namespace Twintsam.Html
                     expectedOutput.Replace("\r\n", "\n"),
                     actualOutput.Replace("\r\n", "\n").ToString());
                 Assert.AreEqual(parseErrors, this.parseErrors);
-            } catch (NotImplementedException) {
+            } catch (NotImplementedException nie) {
                 // Amnesty for those that confess
 #if !NUNIT
+                Trace.Write(nie);
                 Assert.Inconclusive("Not Implemented");
 #endif
+            } finally {
+                Trace.WriteLine("Actual:");
+                Trace.WriteLine(actualOutput);
+                Trace.WriteLine("");
             }
         }
 
