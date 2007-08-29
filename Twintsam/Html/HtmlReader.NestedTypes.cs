@@ -247,7 +247,7 @@ namespace Twintsam.Html
                 }
                 if (_pendingToken != null) {
                     _pendingToken = null;
-                    return base.EOF;
+                    return !base.EOF;
                 }
                 return base.Read();
             }
