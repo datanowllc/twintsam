@@ -96,6 +96,7 @@ namespace Twintsam.Html
 
         private Queue<Token> _pendingOutputTokens = new Queue<Token>();
         private int _attributeIndex = -1;
+        private int _depth;
 
         private CompatibilityMode _compatMode = CompatibilityMode.Standards;
 
@@ -242,8 +243,19 @@ namespace Twintsam.Html
         {
             get
             {
-                // TODO: Depth
-                return 0;
+                if (_attributeIndex >= 0) {
+                    return _depth + 1;
+                }
+                return _depth;
+            }
+        }
+        private void UpdateDepth()
+        {
+            XmlNodeType nodeType = NodeType;
+            if (nodeType == XmlNodeType.Element){
+                _depth++;
+            } else if (nodeType == XmlNodeType.EndElement) {
+                _depth--;
             }
         }
 

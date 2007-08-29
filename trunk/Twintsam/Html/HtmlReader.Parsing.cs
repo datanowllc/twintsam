@@ -150,6 +150,8 @@ namespace Twintsam.Html
 
         public override bool Read()
         {
+            UpdateDepth();
+
             if (_pendingOutputTokens.Count > 0) {
                 _pendingOutputTokens.Dequeue();
                 if (_pendingOutputTokens.Count > 0) {
@@ -159,9 +161,24 @@ namespace Twintsam.Html
             if (_tokenizer.EOF) {
                 return false;
             }
-            if (!_tokenizer.Read()) {
-                return ProcessEndOfFile();
+            bool canPause = false;
+            while (!canPause) {
+                if (!_tokenizer.Read()) {
+                    ProcessEndOfFile();
+                    return _pendingOutputTokens.Count > 0;
+                }
+                canPause = ParseToken();
             }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Processes the current token from the tokenizer.
+        /// </summary>
+        /// <returns><b>true</b> if the <see cref="HtmlReader"/> can be paused until the next call to <see cref="Read"/>; <b>false</b> if the next token should be processed right away.</returns>
+        private bool ParseToken()
+        {
             ParsingState parsingState;
             do {
                 switch (_phase) {
@@ -179,14 +196,9 @@ namespace Twintsam.Html
                 default:
                     throw new InvalidOperationException();
                 }
-                if (parsingState == ParsingState.ProcessNextToken) {
-                    if (!_tokenizer.Read()) {
-                        return ProcessEndOfFile();
-                    }
-                }
-            } while (parsingState != ParsingState.Pause);
+            } while (parsingState == ParsingState.ReprocessCurrentToken);
 
-            return true;
+            return parsingState == ParsingState.Pause;
         }
 
         private string ExtractLeadingWhitespace()
@@ -208,7 +220,7 @@ namespace Twintsam.Html
             return ParsingState.ReprocessCurrentToken;
         }
 
-        private bool ProcessEndOfFile()
+        private void ProcessEndOfFile()
         {
             switch (_phase) {
             case TreeConstructionPhase.Initial:
@@ -224,7 +236,7 @@ namespace Twintsam.Html
                 goto case TreeConstructionPhase.Main;
             case TreeConstructionPhase.Main:
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-main0
-                bool generated = GenerateImpliedEndTags(null);
+                GenerateImpliedEndTags(null);
                 if (_openElements.Count > 2) {
                     OnParseError("Unexpected end of stream. Missing closing tags.");
                 } else if (_openElements.Count == 2
@@ -234,9 +246,9 @@ namespace Twintsam.Html
                             _openElements.Peek().name, ") first."));
                 }
                 // TODO: fragment case
-                return generated;
+                break;
             case TreeConstructionPhase.TrailingEnd:
-                return false; // Nothing to do
+                break; // Nothing to do
             default:
                 throw new InvalidOperationException();
             }
