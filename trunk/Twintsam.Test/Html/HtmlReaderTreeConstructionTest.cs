@@ -117,7 +117,8 @@ namespace Twintsam.Html
             } catch (NotImplementedException nie) {
                 // Amnesty for those that confess
 #if !NUNIT
-                Trace.Write(nie);
+                Trace.WriteLine("");
+                Trace.WriteLine(nie);
                 Assert.Inconclusive("Not Implemented");
 #endif
             } finally {
@@ -128,7 +129,6 @@ namespace Twintsam.Html
                 Trace.WriteLine("");
                 Trace.WriteLine("Actual:");
                 Trace.WriteLine(actualOutput);
-                Trace.WriteLine("");
             }
         }
 

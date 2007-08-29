@@ -164,9 +164,6 @@ namespace Twintsam.Html
             get { return _contentModel; }
             set
             {
-                if (ReadState != ReadState.Initial) {
-                    throw new InvalidOperationException();
-                }
                 _contentModel = value;
             }
         }
@@ -494,8 +491,6 @@ namespace Twintsam.Html
 
             if (_tokenType == XmlNodeType.Element) {
                 _lastEmittedStartTagName = _name;
-            } else {
-                _lastEmittedStartTagName = null;
             }
 
             _tokenType = newTokenType;
