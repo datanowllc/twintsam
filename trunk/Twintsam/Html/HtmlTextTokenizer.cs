@@ -140,7 +140,7 @@ namespace Twintsam.Html
                 case ParsingFunction.Initial:
                     return ReadState.Initial;
                 case ParsingFunction.Eof:
-                    return ReadState.EndOfFile;
+                    return (_textToken.Length > 0) ? ReadState.Interactive : ReadState.EndOfFile;
                 case ParsingFunction.ReaderClosed:
                     return ReadState.Closed;
                 default:
@@ -151,7 +151,7 @@ namespace Twintsam.Html
 
         public override bool EOF
         {
-            get { return _currentParsingFunction == ParsingFunction.Eof; }
+            get { return (_textToken.Length == 0) && (_currentParsingFunction == ParsingFunction.Eof); }
         }
 
         public override XmlNameTable NameTable
