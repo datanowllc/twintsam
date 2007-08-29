@@ -96,6 +96,7 @@ namespace Twintsam.Html
 
         private Queue<Token> _pendingOutputTokens = new Queue<Token>();
         private int _attributeIndex = -1;
+        private bool _inAttributeValue;
         private int _depth;
 
         private CompatibilityMode _compatMode = CompatibilityMode.Standards;
@@ -154,7 +155,7 @@ namespace Twintsam.Html
             get
             {
                 if (_attributeIndex >= 0) {
-                    return XmlNodeType.Attribute;
+                    return _inAttributeValue ? XmlNodeType.Text : XmlNodeType.Attribute;
                 } else if (_pendingOutputTokens.Count > 0) {
                     return _pendingOutputTokens.Peek().tokenType;
                 }
@@ -166,6 +167,9 @@ namespace Twintsam.Html
         {
             get
             {
+                if (_attributeIndex >= 0 && _inAttributeValue) {
+                    return String.Empty;
+                }
                 if (_pendingOutputTokens.Count > 0) {
                     if (_attributeIndex >= 0) {
                         return _pendingOutputTokens.Peek().attributes[_attributeIndex].name;
@@ -244,6 +248,9 @@ namespace Twintsam.Html
             get
             {
                 if (_attributeIndex >= 0) {
+                    if (_inAttributeValue) {
+                        return _depth + 2;
+                    }
                     return _depth + 1;
                 }
                 return _depth;
@@ -252,7 +259,7 @@ namespace Twintsam.Html
         private void UpdateDepth()
         {
             XmlNodeType nodeType = NodeType;
-            if (nodeType == XmlNodeType.Element){
+            if (nodeType == XmlNodeType.Element) {
                 _depth++;
             } else if (nodeType == XmlNodeType.EndElement) {
                 _depth--;
@@ -272,6 +279,9 @@ namespace Twintsam.Html
 
         protected int GetAttributeIndex(string name)
         {
+            if (_attributeIndex >= 0 && _inAttributeValue) {
+                return -1;
+            }
             if (_pendingOutputTokens.Count > 0) {
                 int index = 0;
                 foreach (Attribute attribute in _pendingOutputTokens.Peek().attributes) {
@@ -325,6 +335,9 @@ namespace Twintsam.Html
 
         public override void MoveToAttribute(int i)
         {
+            if (_attributeIndex >= 0 && _inAttributeValue) {
+                throw new ArgumentOutOfRangeException("i");
+            }
             int attributeIndex = _attributeIndex;
             _attributeIndex = -1;
             if (i < 0 || i >= AttributeCount) {
@@ -332,16 +345,21 @@ namespace Twintsam.Html
                 throw new ArgumentOutOfRangeException("i");
             }
             _attributeIndex = i;
+            _inAttributeValue = false;
         }
 
         public override bool MoveToAttribute(string name, string ns)
         {
+            if (_attributeIndex >= 0 && _inAttributeValue) {
+                return false;
+            }
             int attributeIndex = _attributeIndex;
             _attributeIndex = -1;
             if (NodeType == XmlNodeType.Element || NodeType == XmlNodeType.DocumentType) {
                 if (String.IsNullOrEmpty(ns)
                     || String.Equals(ns, Constants.XhtmlNamespaceUri, StringComparison.Ordinal)) {
                     _attributeIndex = GetAttributeIndex(name);
+                    _inAttributeValue = false;
                     return true;
                 }
             }
@@ -356,7 +374,7 @@ namespace Twintsam.Html
 
         public override bool MoveToElement()
         {
-            if (_attributeIndex >= 0) {
+            if (_attributeIndex >= 0 && !_inAttributeValue) {
                 _attributeIndex = -1;
                 return true;
             }
@@ -365,6 +383,9 @@ namespace Twintsam.Html
 
         public override bool MoveToFirstAttribute()
         {
+            if (_attributeIndex >= 0 && _inAttributeValue) {
+                return false;
+            }
             int attributeIndex = _attributeIndex;
             _attributeIndex = -1;
             if (AttributeCount <= 0) {
@@ -372,11 +393,15 @@ namespace Twintsam.Html
                 return false;
             }
             _attributeIndex = 0;
+            _inAttributeValue = false;
             return true;
         }
 
         public override bool MoveToNextAttribute()
         {
+            if (_attributeIndex >= 0 && _inAttributeValue) {
+                return false;
+            }
             if (_attributeIndex < 0) {
                 return MoveToFirstAttribute();
             }
@@ -385,6 +410,7 @@ namespace Twintsam.Html
                 _attributeIndex--;
                 return false;
             }
+            _inAttributeValue = false;
             return true;
         }
 
@@ -411,7 +437,11 @@ namespace Twintsam.Html
 
         public override bool ReadAttributeValue()
         {
-            throw new NotImplementedException();
+            if (_attributeIndex < 0) {
+                return false;
+            }
+            _inAttributeValue = !_inAttributeValue;
+            return _inAttributeValue;
         }
 
         public override void ResolveEntity()
@@ -436,6 +466,9 @@ namespace Twintsam.Html
                 if (_lineInfo == null) {
                     return 0;
                 }
+                if (_attributeIndex >= 0 && _pendingOutputTokens.Count > 0) {
+                    return _pendingOutputTokens.Peek().attributes[_attributeIndex].LineNumber;
+                }
                 return _lineInfo.LineNumber;
             }
         }
@@ -446,6 +479,9 @@ namespace Twintsam.Html
             {
                 if (_lineInfo == null) {
                     return 0;
+                }
+                if (_attributeIndex >= 0 && _pendingOutputTokens.Count > 0) {
+                    return _pendingOutputTokens.Peek().attributes[_attributeIndex].LinePosition;
                 }
                 return _lineInfo.LinePosition;
             }
