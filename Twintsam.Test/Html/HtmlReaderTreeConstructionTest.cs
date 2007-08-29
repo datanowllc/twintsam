@@ -113,7 +113,8 @@ namespace Twintsam.Html
                     actualOutput.AppendLine();
                 }
                 Assert.AreEqual(expectedOutput, actualOutput.ToString().Trim());
-                Assert.AreEqual(parseErrors, this.parseErrors);
+                Assert.AreEqual(parseErrors == null ? 0 : parseErrors.Length,
+                    this.parseErrors);
             } catch (NotImplementedException nie) {
                 // Amnesty for those that confess
 #if !NUNIT
