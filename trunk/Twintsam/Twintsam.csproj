@@ -48,7 +48,9 @@
     </Compile>
     <Compile Include="Html\HtmlEntities.cs" />
     <Compile Include="Html\HtmlReader.cs" />
+    <Compile Include="Html\HtmlReader.NestedTypes.cs" />
     <Compile Include="Html\HtmlReader.ParseError.cs" />
+    <Compile Include="Html\HtmlReader.Parsing.cs" />
     <Compile Include="Html\HtmlTextReader.cs" />
     <Compile Include="Html\HtmlTextTokenizer.cs" />
     <Compile Include="Html\HtmlTokenizer.cs" />
