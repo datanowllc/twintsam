@@ -25,23 +25,45 @@ namespace Twintsam.Html
 
         private void reader_ParseError(object source, ParseErrorEventArgs args)
         {
+            if (parseErrors == 0) {
+                Trace.WriteLine("");
+                Trace.WriteLine("Actual errors:");
+            }
+            Trace.WriteLine(String.Format("{0},{1}: {2}", args.LineNumber, args.LinePosition, args.Message));
             parseErrors++;
         }
 
-        private void DoTest(string input, int parseErrors, string expectedOutput)
+        private void DoTest(string input, string expectedOutput, string[] parseErrors)
         {
+            expectedOutput.Trim();
+
+            input = input.Replace("\n", Environment.NewLine);
+            expectedOutput = expectedOutput.Replace("\n", Environment.NewLine);
+
             HtmlReader reader = new HtmlReader(new StringReader(input));
             reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
             Trace.WriteLine("Input:");
             Trace.WriteLine(input);
             Trace.WriteLine("");
+            if (parseErrors == null || parseErrors.Length == 0) {
+                Trace.WriteLine("No expected error.");
+            } else {
+                Trace.WriteLine("Expected errors:");
+                foreach (string parseError in parseErrors) {
+                    Trace.WriteLine(parseError);
+                }
+            }
+            Trace.WriteLine("");
             Trace.WriteLine("Expected:");
             Trace.WriteLine(expectedOutput);
-            Trace.WriteLine("");
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
             try {
                 while (reader.Read()) {
+                    if (reader.NodeType == XmlNodeType.EndElement) {
+                        continue;
+                    }
+
                     actualOutput.Append("| ");
                     if (reader.Depth > 0) {
                         actualOutput.Append(' ', reader.Depth * 2);
@@ -77,7 +99,7 @@ namespace Twintsam.Html
                         }
                         break;
                     case XmlNodeType.EndElement:
-                        break;
+                        throw new InvalidOperationException("EndElement should have been handled above !?");
                     case XmlNodeType.Comment:
                         actualOutput.Append("<!-- ").Append(reader.Value).Append(" -->");
                         break;
@@ -88,12 +110,9 @@ namespace Twintsam.Html
                         Assert.Fail("Unexpected token type: {0}", reader.NodeType);
                         break;
                     }
-
                     actualOutput.AppendLine();
                 }
-                Assert.AreEqual(
-                    expectedOutput.Replace("\r\n", "\n"),
-                    actualOutput.Replace("\r\n", "\n").ToString());
+                Assert.AreEqual(expectedOutput, actualOutput.ToString().Trim());
                 Assert.AreEqual(parseErrors, this.parseErrors);
             } catch (NotImplementedException nie) {
                 // Amnesty for those that confess
@@ -102,6 +121,11 @@ namespace Twintsam.Html
                 Assert.Inconclusive("Not Implemented");
 #endif
             } finally {
+                if (this.parseErrors == 0) {
+                    Trace.WriteLine("");
+                    Trace.WriteLine("No actual error.");
+                }
+                Trace.WriteLine("");
                 Trace.WriteLine("Actual:");
                 Trace.WriteLine(actualOutput);
                 Trace.WriteLine("");

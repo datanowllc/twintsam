@@ -7,6 +7,23 @@ output = codecs.open(sys.argv[2], 'w', 'ascii', 'backslashreplace')
 
 prefix = sys.argv[3].replace('.', '_')
 
+class LinesIterator(object):
+	def __init__(self, iterable):
+		self._iterator = iter(iterable)
+
+	def __iter__(self):
+		# Below, we'll use nested for...in loops over an instance of this class
+		# so make sure we are an iteraTOR and not just an iteraBLE.
+		return self
+
+	def next(self):
+		line = self._iterator.next()
+		if line.endswith('\n'):
+			line = line[:-1]
+		if line.endswith('\r'):
+			line = line[:-1]
+		return line
+
 output.write("""
 #if !NUNIT
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -28,10 +45,7 @@ namespace Twintsam.Html
     {
 """)
 
-# we use the fact that an iterator's __iter__ method
-# returns the same object (with the same "iterating state")
-# so we ensure we're working with an iteraTOR and not an iteraBLE
-tests = iter(tests)
+tests = LinesIterator(tests)
 
 i = 0
 for line in tests:
@@ -42,33 +56,23 @@ for line in tests:
 				break
 			else:
 				inputLines.append(line)
-		if not line or not inputLines: # reached EOF
-			break
-		lastLine = inputLines[-1]
-		if lastLine.endswith('\n'):
-			lastLine = lastLine[:-1]
-		if lastLine.endswith('\r'):
-			lastLine = lastLine[:-1]
-		inputLines[-1] = lastLine
-		input = ''.join(inputLines)
+		input = '\n'.join(inputLines)
 		
-		parseErrors = 0
+		parseErrors = []
 		for line in tests:
 			if line.startswith('#document'):
 				break
 			else:
-				parseErrors += 1
-		if not line: # reached EOF
-			break
+				parseErrors.append(line)
 		
 		outputLines = []
 		for line in tests:
-			if line in ['\n', '\r', '\r\n']:
+			if not line:
 				# assuming tests are separated by a blank line
 				break
 			else:
 				outputLines.append(line)
-		expectedOutput = ''.join(outputLines)
+		expectedOutput = '\n'.join(outputLines)
 		
 		output.write("""
 		[TestMethod]
@@ -77,9 +81,12 @@ for line in tests:
 #endif
 		public void Test_%s_%d()
 		{
-			DoTest(@"%s", %d, @"%s");
+			DoTest("%s", "%s", new string[] { %s });
 		}
-		""" % (prefix, prefix, i, input.replace('"', '""'), parseErrors, expectedOutput.replace('"', '""')))
+		""" % (prefix, prefix, i,
+				input.replace('"', '\\"').replace('\n', '\\n'),
+				expectedOutput.replace('"', '\\"').replace('\n', '\\n'),
+				", ".join(['"%s"' % error.replace('"', '\\"').replace('\n', '\\n') for error in parseErrors])))
 		
 		i += 1
 
