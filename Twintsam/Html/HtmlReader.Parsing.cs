@@ -30,11 +30,13 @@ namespace Twintsam.Html
 
         private Token ElementInActiveFormattingElements(string name)
         {
-            for (LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
-                element != null; element = element.Previous) {
-                Debug.Assert(element.Value != null);
-                if (element.Value.name == name) {
-                    return element.Value;
+            if (_activeFormattingElements.Count > 0) {
+                for (LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
+                    element != null; element = element.Previous) {
+                    Debug.Assert(element.Value != null);
+                    if (element.Value.name == name) {
+                        return element.Value;
+                    }
                 }
             }
             return null;
@@ -613,7 +615,27 @@ namespace Twintsam.Html
                         // XXX: that's not what the spec says but it has the same result
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
                     } else {
-                        throw new NotImplementedException();
+                        foreach (Token token in _openElements) {
+                            if (token.name == "li") {
+                                List<string> poppeds = new List<string>();
+                                Token popped;
+                                do {
+                                    popped = _openElements.Pop();
+                                    poppeds.Add(popped.name);
+                                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(popped.name));
+                                } while (popped.name != "li");
+                                if (poppeds.Count > 1) {
+                                    poppeds.RemoveAt(poppeds.Count - 1);
+                                    OnParseError(String.Concat("Missing end tag(s): ",
+                                        String.Join(", ", poppeds.ToArray()), "."));
+                                }
+                                break;
+                            } else if ((Constants.IsScopingElement(token.name) || Constants.IsSpecialElement(token.name))
+                                && (token.name != "address" && token.name != "div")) {
+                                break;
+                            }
+                        }
+                        return InsertHtmlElement();
                     }
                 case "dd":
                 case "dt":
@@ -621,7 +643,27 @@ namespace Twintsam.Html
                         // XXX: that's not what the spec says but it has the same result
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
                     } else {
-                        throw new NotImplementedException();
+                        foreach (Token token in _openElements) {
+                            if (token.name == "dd" || token.name == "dt") {
+                                List<string> poppeds = new List<string>();
+                                Token popped;
+                                do {
+                                    popped = _openElements.Pop();
+                                    poppeds.Add(popped.name);
+                                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(popped.name));
+                                } while (popped.name != "dd" && token.name != "dt");
+                                if (poppeds.Count > 1) {
+                                    poppeds.RemoveAt(poppeds.Count - 1);
+                                    OnParseError(String.Concat("Missing end tag(s): ",
+                                        String.Join(", ", poppeds.ToArray()), "."));
+                                }
+                                break;
+                            } else if ((Constants.IsScopingElement(token.name) || Constants.IsSpecialElement(token.name))
+                                && (token.name != "address" && token.name != "div")) {
+                                break;
+                            }
+                        }
+                        return InsertHtmlElement();
                     }
                 case "plaintext":
                     if (IsInScope("p", false)) {
@@ -643,7 +685,15 @@ namespace Twintsam.Html
                     if (a != null) {
                         OnParseError("Unexpected start tag (a) implies end tag (a)");
                         // TODO: act as if an "a" end tag had been seen then remove 'a' from _openElements and _activeFormattingElements.Peek().
-                        throw new NotImplementedException();
+                        _tokenizer.ReplaceToken(Token.CreateEndTag("a"));
+                        ParseToken();
+                        // XXX: the spec actually says to just _openElements.Remove(a), but Stack<> has no Remove method.
+                        if (_openElements.Peek() == a) {
+                            _openElements.Pop();
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        _activeFormattingElements.Peek().Remove(a);
                     }
                     ReconstructActiveFormattingElements();
                     _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
@@ -726,12 +776,15 @@ namespace Twintsam.Html
                     }
                 case "image":
                     OnParseError("Unexpected start tag (image). Treated as img.");
-                    Token token = _tokenizer.Token;
-                    token.name = "img";
-                    _tokenizer.ReplaceToken(token);
+                    Token img = _tokenizer.Token;
+                    img.name = "img";
+                    _tokenizer.ReplaceToken(img);
                     return ParsingState.ReprocessCurrentToken;
                 case "input":
-                    throw new NotImplementedException();
+                    ReconstructActiveFormattingElements();
+                    InsertHtmlElement();
+                    _openElements.Pop();
+                    return ParsingState.Pause;
                 case "isindex":
                     throw new NotImplementedException();
                 case "textarea":
@@ -744,7 +797,9 @@ namespace Twintsam.Html
                     // TODO: case when scripting is enabled
                     throw new NotImplementedException();
                 case "select":
-                    throw new NotImplementedException();
+                    ReconstructActiveFormattingElements();
+                    _insertionMode = InsertionMode.InSelect;
+                    return InsertHtmlElement();
                 case "caption":
                 case "col":
                 case "colgroup":
@@ -759,7 +814,8 @@ namespace Twintsam.Html
                 case "th":
                 case "thead":
                 case "tr":
-                    throw new NotImplementedException();
+                    OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored."));
+                    return ParsingState.ProcessNextToken;
                 case "event-source":
                 case "section":
                 case "nav":
@@ -769,7 +825,8 @@ namespace Twintsam.Html
                 case "footer":
                 case "datagrid":
                 case "command":
-                    throw new NotImplementedException();
+                    Trace.TraceWarning("Behavior not even yet defined in the current draft for start tag: {0}.", _tokenizer.Name);
+                    return InsertHtmlElement();
                 default:
                     ReconstructActiveFormattingElements();
                     return InsertHtmlElement();
