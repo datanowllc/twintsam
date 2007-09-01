@@ -130,9 +130,13 @@ namespace Twintsam.Html
                         }
                     }
                 }
-            } catch (NotImplementedException) {
+            } catch (NotImplementedException nie) {
                 // Amnesty for those that confess
-#if !NUNIT
+                Trace.WriteLine("");
+                Trace.WriteLine(nie);
+#if NUNIT
+                Assert.Ignore("Not Implemented");
+#else
                 Assert.Inconclusive("Not Implemented");
 #endif
             }
