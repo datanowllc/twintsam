@@ -187,9 +187,13 @@ namespace Twintsam.Html
         {
             get
             {
-                if (NodeType == XmlNodeType.Element) {
+                if (NodeType != XmlNodeType.Element) {
                     return false;
                 }
+                if (Constants.IsVoidElement(Name)) {
+                    return true;
+                }
+                // Special case for misplaced elements (html with attributes inside body for example is emitted as an empty html element)
                 if (_pendingOutputTokens.Count > 0) {
                     return _pendingOutputTokens.Peek().hasTrailingSolidus;
                 }
@@ -259,7 +263,7 @@ namespace Twintsam.Html
         private void UpdateDepth()
         {
             XmlNodeType nodeType = NodeType;
-            if (nodeType == XmlNodeType.Element) {
+            if (nodeType == XmlNodeType.Element && !IsEmptyElement) {
                 _depth++;
             } else if (nodeType == XmlNodeType.EndElement) {
                 _depth--;

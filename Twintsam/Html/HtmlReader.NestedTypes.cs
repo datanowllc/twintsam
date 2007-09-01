@@ -78,6 +78,7 @@ namespace Twintsam.Html
         {
             Initial,
             Root,
+            CdataOrRcdata, // XXX: special phase for the "generic (R)CDATA parsing algorithm
             Main,
             TrailingEnd,
         }

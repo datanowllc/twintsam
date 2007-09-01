@@ -28,7 +28,8 @@ namespace Twintsam.Html
 
         #region 8.2.4.3.2. The list of active formatting elements
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#list-of4
-        private Stack<LinkedList<Token>> _activeFormattingElements = new Stack<LinkedList<Token>>();
+        private Stack<LinkedList<Token>> _activeFormattingElements = new Stack<LinkedList<Token>>(
+            new LinkedList<Token>[] { new LinkedList<Token>() });
 
         private Token ElementInActiveFormattingElements(string name)
         {
@@ -194,6 +195,8 @@ namespace Twintsam.Html
                 return ParseRoot();
             case TreeConstructionPhase.Main:
                 return ParseMain();
+            case TreeConstructionPhase.CdataOrRcdata:
+                return ParseCdataOrRcdata();
             case TreeConstructionPhase.TrailingEnd:
                 throw new NotImplementedException();
             default:
@@ -236,10 +239,15 @@ namespace Twintsam.Html
                 InsertHtmlElement(Token.CreateStartTag("html"));
                 _phase = TreeConstructionPhase.Main;
                 goto case TreeConstructionPhase.Main;
+            case TreeConstructionPhase.CdataOrRcdata:
+                // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#generic0
+                OnParseError("Unexpected end of stream in CDATA or RCDATA");
+                _phase = TreeConstructionPhase.Main;
+                goto case TreeConstructionPhase.Main;
             case TreeConstructionPhase.Main:
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-main0
                 if (GenerateImpliedEndTags(null)) {
-                    // an implied end tag has been generated (i.e. a token has been pushedto the tokenizer, ready to be processed).
+                    // an implied end tag has been generated (i.e. a token has been pushed to the tokenizer, ready to be processed).
                     return CurrentTokenizerTokenState.Unprocessed;
                 }
                 if (_openElements.Count > 2) {
@@ -337,6 +345,40 @@ namespace Twintsam.Html
                 InsertHtmlElement(Token.CreateStartTag("html"));
                 _phase = TreeConstructionPhase.Main;
                 return CurrentTokenizerTokenState.Unprocessed;
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private CurrentTokenizerTokenState ParseCdataOrRcdata()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#generic0
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Text:
+                return CurrentTokenizerTokenState.Emitted;
+            case XmlNodeType.EndElement:
+                _phase = TreeConstructionPhase.Main;
+                if (_openElements.Peek().name != _tokenizer.Name) {
+                    OnParseError(
+                        String.Concat("CDATA or RCDATA ends with an end tag with unexpected name: ",
+                            _tokenizer.Name, ". Expected: ", _openElements.Peek().name, "."));
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                    return CurrentTokenizerTokenState.Ignored;
+                }
+                return CurrentTokenizerTokenState.Emitted;
+            case XmlNodeType.Comment:
+                _phase = TreeConstructionPhase.Main;
+                OnParseError("Unexpected comment in CDATA or RCDATA. Expected end tag.");
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                return CurrentTokenizerTokenState.Ignored;
+            case XmlNodeType.Element:
+                _phase = TreeConstructionPhase.Main;
+                OnParseError("Unexpected start tag in CDATA or RCDATA. Expected end tag.");
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                return CurrentTokenizerTokenState.Ignored;
             default:
                 throw new InvalidOperationException(
                     String.Concat("Unexpected token type: ",
@@ -454,9 +496,9 @@ namespace Twintsam.Html
                     // TODO: change charset if needed
                     return InsertHtmlElement();
                 case "title":
-                    // FIXME: that's not what the spec says
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Rcdata;
-                    return InsertHtmlElement();
+                    return CurrentTokenizerTokenState.Emitted;
                 case "noscript":
                     // TODO: case when scripting is enabled:
                     //if (_scriptingElabled)
@@ -467,14 +509,14 @@ namespace Twintsam.Html
                     _insertionMode = InsertionMode.InHeadNoscript;
                     return InsertHtmlElement();
                 case "style":
-                    // FIXME: that's not what the spec says
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return InsertHtmlElement();
+                    return CurrentTokenizerTokenState.Emitted;
                 case "script":
-                    // FIXME: that's not what the spec says
-                    _tokenizer.ContentModel = ContentModel.Cdata;
                     // TODO: script execution
-                    return InsertHtmlElement();
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
+                    _tokenizer.ContentModel = ContentModel.Cdata;
+                    return CurrentTokenizerTokenState.Emitted;
                 case "head":
                     OnParseError("Unexpected HEAD start tag. Ignored.");
                     return CurrentTokenizerTokenState.Ignored;
@@ -743,9 +785,9 @@ namespace Twintsam.Html
                     return InsertHtmlElement();
                 case "xmp":
                     ReconstructActiveFormattingElements();
-                    // FIXME: that's not what the spec says
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return InsertHtmlElement();
+                    return CurrentTokenizerTokenState.Emitted;
                 case "table":
                     if (IsInScope("p", false)) {
                         // XXX: that's not what the spec says but it has the same result
