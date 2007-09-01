@@ -76,6 +76,7 @@ for line in tests:
 		
 		output.write("""
 		[TestMethod]
+		[Description("%s")]
 #if NUNIT
 		[Category("TreeConstruction.%s")]
 #endif
@@ -83,7 +84,8 @@ for line in tests:
 		{
 			DoTest("%s", "%s", new string[] { %s });
 		}
-		""" % (prefix, prefix, i,
+		""" % (input.replace('"', '\\"').replace('\n', '\\n'),
+				prefix, prefix, i,
 				input.replace('"', '\\"').replace('\n', '\\n'),
 				expectedOutput.replace('"', '\\"').replace('\n', '\\n'),
 				", ".join(['"%s"' % error.replace('"', '\\"').replace('\n', '\\n') for error in parseErrors])))
