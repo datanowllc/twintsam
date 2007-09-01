@@ -489,10 +489,6 @@ namespace Twintsam.Html
 
             _tokenState = TokenState.Initialized;
 
-            if (_tokenType == XmlNodeType.Element) {
-                _lastEmittedStartTagName = _name;
-            }
-
             _tokenType = newTokenType;
             _name = null;
             _value = null;
@@ -504,6 +500,9 @@ namespace Twintsam.Html
         private void EmitToken()
         {
             Debug.Assert(_tokenState == TokenState.Initialized);
+            if (_tokenType == XmlNodeType.Element) {
+                _lastEmittedStartTagName = _name;
+            }
             _tokenState = TokenState.Complete;
         }
 
@@ -729,20 +728,24 @@ namespace Twintsam.Html
                 case '\f':
                 case ' ':
                     _input.Read();
+                    _name = _buffer.ToString();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
                 case '>':
                     _input.Read();
+                    _name = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in tag name");
+                    _name = _buffer.ToString();
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case '/':
                     _input.Read();
+                    _name = _buffer.ToString();
                     CheckPermittedSlash();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
@@ -755,7 +758,6 @@ namespace Twintsam.Html
                     break;
                 }
             }
-            _name = _buffer.ToString();
             _buffer.Length = 0;
         }
 
