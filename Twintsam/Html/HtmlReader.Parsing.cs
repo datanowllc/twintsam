@@ -99,7 +99,7 @@ namespace Twintsam.Html
 
             if (_openElements.Count > 0) {
                 string element = _openElements.Peek().name;
-                if ((omitted == null || String.Equals(element, omitted, StringComparison.Ordinal))
+                if ((omitted != null && !String.Equals(element, omitted, StringComparison.Ordinal))
                     && Constants.HasOptionalEndTag(element)) {
                     _tokenizer.PushToken(Token.CreateEndTag(element));
                     return true;
@@ -526,11 +526,8 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
                 case "head":
-#if DEBUG
-                    Debug.Assert(_openElements.Pop().name == "head");
-#else
+                    Debug.Assert(_openElements.Peek().name == "head");
                     _openElements.Pop();
-#endif
                     // XXX: we don't emit the head end tag, we'll emit it later before switching to the "in body" insertion mode
                     _insertionMode = InsertionMode.AfterHead;
                     return CurrentTokenizerTokenState.Ignored;
@@ -806,22 +803,16 @@ namespace Twintsam.Html
                 case "spacer":
                 case "wbr":
                     ReconstructActiveFormattingElements();
-#if DEBUG
-                    Debug.Assert(_openElements.Pop().name == _tokenizer.Name);
-#else
+                    Debug.Assert(_openElements.Peek().name == _tokenizer.Name);
                     _openElements.Pop();
-#endif
                     return InsertHtmlElement();
                 case "hr":
                     if (IsInScope("p", false)) {
                         // XXX: that's not what the spec says but it has the same result
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
                     } else {
-#if DEBUG
-                        Debug.Assert(_openElements.Pop().name == _tokenizer.Name);
-#else
+                        Debug.Assert(_openElements.Peek().name == _tokenizer.Name);
                     _openElements.Pop();
-#endif
                         return InsertHtmlElement();
                     }
                 case "image":
@@ -838,13 +829,20 @@ namespace Twintsam.Html
                 case "isindex":
                     throw new NotImplementedException();
                 case "textarea":
-                    throw new NotImplementedException();
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
+                    _tokenizer.ContentModel = ContentModel.Rcdata;
+                    return CurrentTokenizerTokenState.Emitted;
                 case "iframe":
                 case "noembed":
                 case "noframe":
-                    throw new NotImplementedException();
+                    _phase = TreeConstructionPhase.CdataOrRcdata;
+                    _tokenizer.ContentModel = ContentModel.Cdata;
+                    return CurrentTokenizerTokenState.Emitted;
                 case "noscript":
-                    // TODO: case when scripting is enabled
+                    // TODO: case when scripting is enabled:
+                    //_phase = TreeConstructionPhase.CdataOrRcdata;
+                    //_tokenizer.ContentModel = ContentModel.Cdata;
+                    //return CurrentTokenizerTokenState.Emitted;
                     throw new NotImplementedException();
                 case "select":
                     ReconstructActiveFormattingElements();
@@ -882,7 +880,250 @@ namespace Twintsam.Html
                     return InsertHtmlElement();
                 }
             case XmlNodeType.EndElement:
-                throw new NotImplementedException();
+                switch (_tokenizer.Name) {
+                case "body":
+                    // TODO: fragment case
+                    foreach (Token token in _openElements) {
+                        switch (token.name) {
+                        case "dd":
+                        case "dt":
+                        case "li":
+                        case "p":
+                        case "tbody":
+                        case "td":
+                        case "tfoot":
+                        case "th":
+                        case "thead":
+                        case "tr":
+                        case "body":
+                        case "html":
+                            continue;
+                        default:
+                            OnParseError("XXX: Unexpected token in the stack of open elements");
+                            break;
+                        }
+                        break;
+                    }
+                    _insertionMode = InsertionMode.AfterBody;
+                    // XXX: similarly to the head end tag, we'll emit the body end tag while emitting the html end tag (i.e. at EOF)
+                    return CurrentTokenizerTokenState.Ignored;
+                case "html":
+                    // TODO: fragment case
+                    // XXX: simarly to the body end tag, we'll emit the html end tag in the trailing end phase
+                    // XXX: this is not what the spec says
+                    return CurrentTokenizerTokenState.Ignored;
+                case "address":
+                case "blockquote":
+                case "center":
+                case "dir":
+                case "div":
+                case "dl":
+                case "fieldset":
+                case "listing":
+                case "menu":
+                case "ol":
+                case "pre":
+                case "ul":
+                    if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != _tokenizer.Name) {
+                        OnParseError(
+                            String.Concat("End tag (", _tokenizer.Name,
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    }
+                    if (IsInScope(_tokenizer.Name, false)) {
+                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                        }
+                    }
+                    return CurrentTokenizerTokenState.Emitted;
+                case "form":
+                    if (IsInScope("form", false) && GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != "form") {
+                        OnParseError(
+                            String.Concat("End tag (", "form",
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    } else {
+                        _openElements.Pop();
+                    }
+                    return CurrentTokenizerTokenState.Emitted;
+                case "p":
+                    if (IsInScope("p", false) && GenerateImpliedEndTags("p")) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != "p") {
+                        OnParseError(
+                            String.Concat("End tag (", "p",
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    }
+                    if (IsInScope("p", false)) {
+                        do {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Pop().name));
+                        } while (IsInScope("p", false));
+                        return CurrentTokenizerTokenState.Emitted;
+                    } else {
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("p"));
+                    }
+                case "dd":
+                case "dt":
+                case "li":
+                    if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(_tokenizer.Name)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != _tokenizer.Name) {
+                        OnParseError(
+                            String.Concat("End tag (", _tokenizer.Name,
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    }
+                    if (IsInScope(_tokenizer.Name, false)) {
+                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                        }
+                    }
+                    return CurrentTokenizerTokenState.Emitted;
+                case "h1":
+                case "h2":
+                case "h3":
+                case "h4":
+                case "h5":
+                case "h6":
+                    if ((IsInScope("h1", false) || IsInScope("h2", false) || IsInScope("h3", false)
+                         || IsInScope("h4", false) || IsInScope("h5", false) || IsInScope("h6", false))
+                        && GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != _tokenizer.Name) {
+                        OnParseError(
+                            String.Concat("End tag (", _tokenizer.Name,
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    }
+                    if (IsInScope("h1", false) || IsInScope("h2", false) || IsInScope("h3", false)
+                         || IsInScope("h4", false) || IsInScope("h5", false) || IsInScope("h6", false)) {
+                        for (Token token = _openElements.Pop();
+                            token.name != "h1" && token.name != "h2" && token.name != "h3"
+                                 && token.name != "h4" && token.name != "h5" && token.name != "h6";
+                            token = _openElements.Pop()) {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                        }
+                    }
+                    // XXX: isn't the spec implicitly saying we should emit a token with the same name as the last popped node above?
+                    return CurrentTokenizerTokenState.Emitted;
+                case "a":
+                case "b":
+                case "big":
+                case "em":
+                case "font":
+                case "i":
+                case "nobr":
+                case "s":
+                case "small":
+                case "strike":
+                case "strong":
+                case "tt":
+                case "u":
+                    Token formattingElement = ElementInActiveFormattingElements(_tokenizer.Name);
+                    if (formattingElement == null
+                        || _openElements.Contains(formattingElement) && !IsInScope(formattingElement.name, false)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    if (!_openElements.Contains(formattingElement)) {
+                        OnParseError("???");
+                        // TODO: Stack<> has no Remove method
+                        if (_openElements.Peek() == formattingElement) {
+                            _openElements.Pop();
+                        } else {
+                            throw new NotImplementedException();
+                        }
+                        return CurrentTokenizerTokenState.Emitted;
+                    }
+                    Debug.Assert(_openElements.Contains(formattingElement) && IsInScope(formattingElement.name, false));
+                    if (_openElements.Peek() != formattingElement) {
+                        OnParseError("???");
+                    }
+                    // TODO: steps 2 and followings
+                    throw new NotImplementedException();
+                case "button":
+                case "marquee":
+                case "object":
+                    if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.Peek().name != _tokenizer.Name) {
+                        OnParseError(
+                            String.Concat("End tag (", _tokenizer.Name,
+                                ") seen too early. Expected other end tag (",
+                                _openElements.Peek().name, ")."));
+                    }
+                    if (IsInScope(_tokenizer.Name, false)) {
+                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                        }
+                        _activeFormattingElements.Pop();
+                    }
+                    return CurrentTokenizerTokenState.Emitted;
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "frame":
+                case "frameset":
+                case "head":
+                case "option":
+                case "optgroup":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                case "area":
+                case "basefont":
+                case "bgsound":
+                case "br":
+                case "embed":
+                case "hr":
+                case "iframe":
+                case "image":
+                case "img":
+                case "input":
+                case "isindex":
+                case "noembed":
+                case "noframes":
+                case "param":
+                case "select":
+                case "spacer":
+                case "table":
+                case "textarea":
+                case "wbr":
+                    OnParseError("???");
+                    return CurrentTokenizerTokenState.Ignored;
+                case "noscript":
+                    // TODO: case when scripting is enabled:
+                    //OnParseError("???");
+                    //return CurrentTokenizerTokenState.Ignored;
+                    throw new NotImplementedException();
+                case "event-source":
+                case "section":
+                case "nav":
+                case "article":
+                case "aside":
+                case "header":
+                case "footer":
+                case "datagrid":
+                case "command":
+                    Trace.TraceWarning("Behavior not even yet defined in the current draft for start tag: {0}.", _tokenizer.Name);
+                    return CurrentTokenizerTokenState.Emitted;
+                default:
+                    throw new NotImplementedException();
+                }
             default:
                 throw new InvalidOperationException(
                     String.Concat("Unexpected token type: ",
