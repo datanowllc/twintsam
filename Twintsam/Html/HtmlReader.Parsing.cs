@@ -245,7 +245,7 @@ namespace Twintsam.Html
                 if (_openElements.Count > 2) {
                     OnParseError("Unexpected end of stream. Missing closing tags.");
                 } else if (_openElements.Count == 2
-                    && String.Equals(_openElements.Peek().name, "body", StringComparison.Ordinal)) {
+                    && !String.Equals(_openElements.Peek().name, "body", StringComparison.Ordinal)) {
                     OnParseError(
                         String.Concat("Unexpected end of stream. Expected end tag (",
                             _openElements.Peek().name, ") first."));
