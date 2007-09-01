@@ -101,11 +101,11 @@ namespace Twintsam.Html
             AfterFrameset,
         }
 
-        private enum ParsingState
+        private enum CurrentTokenizerTokenState
         {
-            ProcessNextToken,
-            ReprocessCurrentToken,
-            Pause,
+            Unprocessed,
+            Ignored,
+            Emitted,
         }
 
         private class Tokenizer : HtmlWrappingTokenizer
