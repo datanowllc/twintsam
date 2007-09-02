@@ -89,6 +89,7 @@ namespace Twintsam.Html
             "-//W3C//DTD XHTML 1.0 Frameset//EN", "-//W3C//DTD XHTML 1.0 Transitional//EN",
         };
 
+        private bool _fragmentCase;
         private Tokenizer _tokenizer;
         private IXmlLineInfo _lineInfo;
         private TreeConstructionPhase _phase;
@@ -110,6 +111,15 @@ namespace Twintsam.Html
                 throw new ArgumentNullException("reader");
             }
             Init(HtmlTokenizer.Create(reader));
+        }
+
+        public HtmlReader(TextReader reader, string fragmentContainer)
+        {
+            if (reader == null) {
+                throw new ArgumentNullException("reader");
+            }
+            Init(HtmlTokenizer.Create(reader, fragmentContainer));
+            _fragmentCase = true;
         }
         #endregion
 
