@@ -11,7 +11,12 @@ namespace Twintsam.Html
 
         #region 8.2.4.3.1 The stack of open elements
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#stack
-        private Stack<Token> _openElements = new Stack<Token>();
+        /// <remarks>
+        /// To achieve the "stack with random access facilities", we're using a linked list.
+        /// The "top of the stack" is the <b>first</b> element in the list; this allows enumeration
+        /// from top to bottom using the list enumerator (from first to last).
+        /// </remarks>
+        private LinkedList<Token> _openElements = new LinkedList<Token>();
 
         private bool IsInScope(string name, bool inTableScope)
         {
@@ -79,7 +84,7 @@ namespace Twintsam.Html
         {
             Debug.Assert(_tokenizer.TokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
-            _openElements.Push(_tokenizer.Token);
+            _openElements.AddFirst(_tokenizer.Token);
             return CurrentTokenizerTokenState.Emitted;
         }
         private void InsertHtmlElement(Token token)
@@ -87,7 +92,7 @@ namespace Twintsam.Html
             Debug.Assert(token != null && token.tokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
             _pendingOutputTokens.Enqueue(token);
-            _openElements.Push(token);
+            _openElements.AddFirst(token);
         }
         #endregion
 
@@ -98,7 +103,7 @@ namespace Twintsam.Html
             Debug.Assert(omitted == null || String.Equals(omitted, omitted.ToLowerInvariant(), StringComparison.Ordinal));
 
             if (_openElements.Count > 0) {
-                string element = _openElements.Peek().name;
+                string element = _openElements.First.Value.name;
                 if ((omitted != null && !String.Equals(element, omitted, StringComparison.Ordinal))
                     && Constants.HasOptionalEndTag(element)) {
                     _tokenizer.PushToken(Token.CreateEndTag(element));
@@ -253,10 +258,10 @@ namespace Twintsam.Html
                 if (_openElements.Count > 2) {
                     OnParseError("Unexpected end of stream. Missing closing tags.");
                 } else if (_openElements.Count == 2
-                    && !String.Equals(_openElements.Peek().name, "body", StringComparison.Ordinal)) {
+                    && !String.Equals(_openElements.First.Value.name, "body", StringComparison.Ordinal)) {
                     OnParseError(
                         String.Concat("Unexpected end of stream. Expected end tag (",
-                            _openElements.Peek().name, ") first."));
+                            _openElements.First.Value.name, ") first."));
                 }
                 // TODO: fragment case
                 return CurrentTokenizerTokenState.Emitted;
@@ -361,23 +366,23 @@ namespace Twintsam.Html
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.EndElement:
                 _phase = TreeConstructionPhase.Main;
-                if (_openElements.Peek().name != _tokenizer.Name) {
+                if (_openElements.First.Value.name != _tokenizer.Name) {
                     OnParseError(
                         String.Concat("CDATA or RCDATA ends with an end tag with unexpected name: ",
-                            _tokenizer.Name, ". Expected: ", _openElements.Peek().name, "."));
-                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                            _tokenizer.Name, ". Expected: ", _openElements.First.Value.name, "."));
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                     return CurrentTokenizerTokenState.Ignored;
                 }
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.Comment:
                 _phase = TreeConstructionPhase.Main;
                 OnParseError("Unexpected comment in CDATA or RCDATA. Expected end tag.");
-                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 return CurrentTokenizerTokenState.Ignored;
             case XmlNodeType.Element:
                 _phase = TreeConstructionPhase.Main;
                 OnParseError("Unexpected start tag in CDATA or RCDATA. Expected end tag.");
-                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Peek().name));
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 return CurrentTokenizerTokenState.Ignored;
             default:
                 throw new InvalidOperationException(
@@ -526,8 +531,8 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
                 case "head":
-                    Debug.Assert(_openElements.Peek().name == "head");
-                    _openElements.Pop();
+                    Debug.Assert(_openElements.First.Value.name == "head");
+                    _openElements.RemoveFirst();
                     // XXX: we don't emit the head end tag, we'll emit it later before switching to the "in body" insertion mode
                     _insertionMode = InsertionMode.AfterHead;
                     return CurrentTokenizerTokenState.Ignored;
@@ -667,7 +672,8 @@ namespace Twintsam.Html
                                 List<string> poppeds = new List<string>();
                                 Token popped;
                                 do {
-                                    popped = _openElements.Pop();
+                                    popped = _openElements.First.Value;
+                                    _openElements.RemoveFirst();
                                     poppeds.Add(popped.name);
                                     _pendingOutputTokens.Enqueue(Token.CreateEndTag(popped.name));
                                 } while (popped.name != "li");
@@ -695,7 +701,8 @@ namespace Twintsam.Html
                                 List<string> poppeds = new List<string>();
                                 Token popped;
                                 do {
-                                    popped = _openElements.Pop();
+                                    popped = _openElements.First.Value;
+                                    _openElements.RemoveFirst();
                                     poppeds.Add(popped.name);
                                     _pendingOutputTokens.Enqueue(Token.CreateEndTag(popped.name));
                                 } while (popped.name != "dd" && token.name != "dt");
@@ -734,12 +741,7 @@ namespace Twintsam.Html
                         // TODO: act as if an "a" end tag had been seen then remove 'a' from _openElements and _activeFormattingElements.Peek().
                         _tokenizer.ReplaceToken(Token.CreateEndTag("a"));
                         ParseToken();
-                        // XXX: the spec actually says to just _openElements.Remove(a), but Stack<> has no Remove method.
-                        if (_openElements.Peek() == a) {
-                            _openElements.Pop();
-                        } else {
-                            throw new NotImplementedException();
-                        }
+                        _openElements.Remove(a);
                         _activeFormattingElements.Peek().Remove(a);
                     }
                     ReconstructActiveFormattingElements();
@@ -803,16 +805,16 @@ namespace Twintsam.Html
                 case "spacer":
                 case "wbr":
                     ReconstructActiveFormattingElements();
-                    Debug.Assert(_openElements.Peek().name == _tokenizer.Name);
-                    _openElements.Pop();
+                    Debug.Assert(_openElements.First.Value.name == _tokenizer.Name);
+                    _openElements.RemoveFirst();
                     return InsertHtmlElement();
                 case "hr":
                     if (IsInScope("p", false)) {
                         // XXX: that's not what the spec says but it has the same result
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
                     } else {
-                        Debug.Assert(_openElements.Peek().name == _tokenizer.Name);
-                    _openElements.Pop();
+                        Debug.Assert(_openElements.First.Value.name == _tokenizer.Name);
+                    _openElements.RemoveFirst();
                         return InsertHtmlElement();
                     }
                 case "image":
@@ -824,7 +826,7 @@ namespace Twintsam.Html
                 case "input":
                     ReconstructActiveFormattingElements();
                     InsertHtmlElement();
-                    _openElements.Pop();
+                    _openElements.RemoveFirst();
                     return CurrentTokenizerTokenState.Emitted;
                 case "isindex":
                     throw new NotImplementedException();
@@ -927,15 +929,19 @@ namespace Twintsam.Html
                     if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != _tokenizer.Name) {
+                    if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError(
                             String.Concat("End tag (", _tokenizer.Name,
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     }
                     if (IsInScope(_tokenizer.Name, false)) {
-                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                        Token token = _openElements.First.Value;
+                        _openElements.RemoveFirst();
+                        while (token.name != _tokenizer.Name) {
                             _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                            token = _openElements.First.Value;
+                            _openElements.RemoveFirst();
                         }
                     }
                     return CurrentTokenizerTokenState.Emitted;
@@ -943,28 +949,29 @@ namespace Twintsam.Html
                     if (IsInScope("form", false) && GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != "form") {
+                    if (_openElements.First.Value.name != "form") {
                         OnParseError(
                             String.Concat("End tag (", "form",
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     } else {
-                        _openElements.Pop();
+                        _openElements.RemoveFirst();
                     }
                     return CurrentTokenizerTokenState.Emitted;
                 case "p":
                     if (IsInScope("p", false) && GenerateImpliedEndTags("p")) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != "p") {
+                    if (_openElements.First.Value.name != "p") {
                         OnParseError(
                             String.Concat("End tag (", "p",
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     }
                     if (IsInScope("p", false)) {
                         do {
-                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.Pop().name));
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                            _openElements.RemoveFirst();
                         } while (IsInScope("p", false));
                         return CurrentTokenizerTokenState.Emitted;
                     } else {
@@ -976,15 +983,19 @@ namespace Twintsam.Html
                     if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(_tokenizer.Name)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != _tokenizer.Name) {
+                    if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError(
                             String.Concat("End tag (", _tokenizer.Name,
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     }
                     if (IsInScope(_tokenizer.Name, false)) {
-                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                        Token token = _openElements.First.Value;
+                        _openElements.RemoveFirst();
+                        while (token.name != _tokenizer.Name) {
                             _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                            token = _openElements.First.Value;
+                            _openElements.RemoveFirst();
                         }
                     }
                     return CurrentTokenizerTokenState.Emitted;
@@ -999,19 +1010,21 @@ namespace Twintsam.Html
                         && GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != _tokenizer.Name) {
+                    if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError(
                             String.Concat("End tag (", _tokenizer.Name,
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     }
                     if (IsInScope("h1", false) || IsInScope("h2", false) || IsInScope("h3", false)
                          || IsInScope("h4", false) || IsInScope("h5", false) || IsInScope("h6", false)) {
-                        for (Token token = _openElements.Pop();
-                            token.name != "h1" && token.name != "h2" && token.name != "h3"
-                                 && token.name != "h4" && token.name != "h5" && token.name != "h6";
-                            token = _openElements.Pop()) {
+                        Token token = _openElements.First.Value;
+                        _openElements.RemoveFirst();
+                        while (token.name != "h1" && token.name != "h2" && token.name != "h3"
+                               && token.name != "h4" && token.name != "h5" && token.name != "h6") {
                             _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                            token = _openElements.First.Value;
+                            _openElements.RemoveFirst();
                         }
                     }
                     // XXX: isn't the spec implicitly saying we should emit a token with the same name as the last popped node above?
@@ -1037,16 +1050,11 @@ namespace Twintsam.Html
                     }
                     if (!_openElements.Contains(formattingElement)) {
                         OnParseError("???");
-                        // TODO: Stack<> has no Remove method
-                        if (_openElements.Peek() == formattingElement) {
-                            _openElements.Pop();
-                        } else {
-                            throw new NotImplementedException();
-                        }
+                        _openElements.Remove(formattingElement);
                         return CurrentTokenizerTokenState.Emitted;
                     }
                     Debug.Assert(_openElements.Contains(formattingElement) && IsInScope(formattingElement.name, false));
-                    if (_openElements.Peek() != formattingElement) {
+                    if (_openElements.First.Value != formattingElement) {
                         OnParseError("???");
                     }
                     // TODO: steps 2 and followings
@@ -1057,15 +1065,19 @@ namespace Twintsam.Html
                     if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
-                    if (_openElements.Peek().name != _tokenizer.Name) {
+                    if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError(
                             String.Concat("End tag (", _tokenizer.Name,
                                 ") seen too early. Expected other end tag (",
-                                _openElements.Peek().name, ")."));
+                                _openElements.First.Value.name, ")."));
                     }
                     if (IsInScope(_tokenizer.Name, false)) {
-                        for (Token token = _openElements.Pop(); token.name != _tokenizer.Name; token = _openElements.Pop()) {
+                        Token token = _openElements.First.Value;
+                        _openElements.RemoveFirst();
+                        while (token.name != _tokenizer.Name) {
                             _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                            token = _openElements.First.Value;
+                            _openElements.RemoveFirst();
                         }
                         _activeFormattingElements.Pop();
                     }
