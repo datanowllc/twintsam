@@ -270,13 +270,20 @@ namespace Twintsam.Html
                     return CurrentTokenizerTokenState.Unprocessed;
                 }
                 // XXX: special case for /head, /body, /frameset and /html
+                Token currentNode = _openElements.First.Value;
                 if ((_insertionMode == InsertionMode.AfterHead
-                        && _openElements.First.Value.name == "head")
+                        && currentNode.name == "head")
                     || (_insertionMode == InsertionMode.AfterBody
-                        && _openElements.First.Value.name == "body")
+                        && currentNode.name == "body")
                     || (_insertionMode == InsertionMode.AfterFrameset
-                        && _openElements.First.Value.name == "frameset")) {
+                        && currentNode.name == "frameset")) {
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
                     _openElements.RemoveFirst();
+                    if (currentNode.name == "head") {
+                        // XXX: create body such that each document has at least ahead and body
+                        _pendingOutputTokens.Enqueue(Token.CreateStartTag("body"));
+                        _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
+                    }
                 }
                 // Back to normal processing
                 if (_openElements.Count > 2) {
@@ -290,6 +297,11 @@ namespace Twintsam.Html
                     && _openElements.First.Next.Value.name != "body") {
                     OnParseError("Unexpected end of stream in HTML fragment.");
                 }
+                // XXX: generate end tags for each open element
+                foreach (Token token in _openElements) {
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                }
+                _openElements.Clear();
                 return CurrentTokenizerTokenState.Emitted;
             case TreeConstructionPhase.TrailingEnd:
                 // Nothing to do
