@@ -7,7 +7,7 @@ namespace Twintsam.Html
 {
     public partial class HtmlReader : XmlReader, IXmlLineInfo
     {
-        public static readonly string[] QuirksModeDoctypePublicIds = {
+        private static readonly string[] QuirksModeDoctypePublicIds = {
             "+//silmaril//dtd html pro v0r11 19970101//en",
             "-//advasoft ltd//dtd html 3.0 aswedit + extensions//en",
             "-//as//dtd html 3.0 aswedit + extensions//en",
@@ -79,13 +79,13 @@ namespace Twintsam.Html
             "html",
         };
 
-        public static readonly string[] QuirksModeDoctypePublicIdsWhenSystemIdIsMissing = {
+        private static readonly string[] QuirksModeDoctypePublicIdsWhenSystemIdIsMissing = {
             "-//w3c//dtd html 4.01 frameset//EN", "-//w3c//dtd html 4.01 transitional//EN"
         };
 
-        public static readonly string QuirksModeDoctypeSystemId = "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd";
+        private static readonly string QuirksModeDoctypeSystemId = "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd";
 
-        public static readonly string[] AlmostStandardsModeDoctypePublicIds = {
+        private static readonly string[] AlmostStandardsModeDoctypePublicIds = {
             "-//W3C//DTD XHTML 1.0 Frameset//EN", "-//W3C//DTD XHTML 1.0 Transitional//EN",
         };
 
@@ -136,12 +136,15 @@ namespace Twintsam.Html
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) {
-                // TODO: add flag to eventually not close the tokenizer
-                // (particularly when it was passed to the constructor)
-                _tokenizer.Close();
+            try {
+                if (disposing) {
+                    // TODO: add flag to eventually not close the tokenizer
+                    // (particularly when it was passed to the constructor)
+                    _tokenizer.Close();
+                }
+            } finally {
+                base.Dispose(disposing);
             }
-            base.Dispose(disposing);
         }
 
         public override void Close()
