@@ -23,8 +23,13 @@ namespace Twintsam.Html
             Debug.Assert(String.Equals(name, name.ToLowerInvariant(), StringComparison.Ordinal));
 
             foreach (Token openElement in _openElements) {
-                if (String.Equals(name, openElement.name, StringComparison.Ordinal)) {
+                if (name == openElement.name) {
                     return true;
+                } else if (openElement.name == "table") {
+                    return false;
+                } else if (!inTableScope && Constants.IsScopingElement(openElement.name)) {
+                    // XXX: html is a scoping element so it will be treated differently depending on whether we're inTableScope or not but still return false in both cases
+                    return false;
                 }
             }
             return false;
@@ -883,9 +888,8 @@ namespace Twintsam.Html
                 case "spacer":
                 case "wbr":
                     ReconstructActiveFormattingElements();
-                    Debug.Assert(_openElements.First.Value.name == _tokenizer.Name);
-                    _openElements.RemoveFirst();
-                    return InsertHtmlElement();
+                    // XXX: we don't bother adding to and then immediately popping from the stack of open elements.
+                    return CurrentTokenizerTokenState.Emitted;
                 case "hr":
                     if (IsInScope("p", false)) {
                         // XXX: that's not what the spec says but it has the same result
