@@ -7,7 +7,7 @@ namespace Twintsam.Html
 {
     public partial class HtmlReader
     {
-        private CurrentTokenizerTokenState _currentTokenizerTokenState = CurrentTokenizerTokenState.Emitted;
+        private CurrentTokenizerTokenState _currentTokenizerTokenState = CurrentTokenizerTokenState.Ignored;
 
         #region 8.2.4.3.1 The stack of open elements
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#stack
@@ -170,6 +170,9 @@ namespace Twintsam.Html
 
         public override bool Read()
         {
+            _attributeIndex = -1;
+            _inAttributeValue = false;
+
             UpdateDepth();
 
             if (_pendingOutputTokens.Count > 0) {
@@ -179,7 +182,7 @@ namespace Twintsam.Html
                 }
                 else if (_currentTokenizerTokenState == CurrentTokenizerTokenState.Emitted)
                 {
-                    return true;
+                    return !_tokenizer.EOF;
                 }
             }
             if (_tokenizer.EOF) {
@@ -255,6 +258,9 @@ namespace Twintsam.Html
             case TreeConstructionPhase.CdataOrRcdata:
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#generic0
                 OnParseError("Unexpected end of stream in CDATA or RCDATA");
+                Debug.Assert(Constants.IsCdataElement(_openElements.First.Value.name)
+                    || Constants.IsRcdataElement(_openElements.First.Value.name));
+                _openElements.RemoveFirst();
                 _phase = TreeConstructionPhase.Main;
                 goto case TreeConstructionPhase.Main;
             case TreeConstructionPhase.Main:
@@ -303,7 +309,7 @@ namespace Twintsam.Html
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.DocumentType:
                 if (!String.Equals(_tokenizer.Name, "HTML", StringComparison.OrdinalIgnoreCase)) {
-                    OnParseError("DOCTYPE name is not HTML (case-insitive)");
+                    OnParseError("DOCTYPE name is not HTML (case-insensitive)");
                     _compatMode = CompatibilityMode.QuirksMode;
                 } else if (_tokenizer.AttributeCount != 0) {
                     OnParseError("DOCTYPE has public and/or system identifier");
@@ -333,7 +339,7 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
             case XmlNodeType.Text:
                 // XXX: For text tokens, we should extract and ignore leading whitespace, but this will be done in the root phase.
-                OnParseError("Unexpected non-space characters. Expected DOCTYPE.");
+                OnParseError("Missing DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
                 _phase = TreeConstructionPhase.Root;
                 return CurrentTokenizerTokenState.Unprocessed;
@@ -381,17 +387,22 @@ namespace Twintsam.Html
         private CurrentTokenizerTokenState ParseCdataOrRcdata()
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#generic0
+            Debug.Assert(Constants.IsCdataElement(_openElements.First.Value.name)
+                || Constants.IsRcdataElement(_openElements.First.Value.name));
+
             switch (_tokenizer.TokenType) {
             case XmlNodeType.Whitespace:
             case XmlNodeType.Text:
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.EndElement:
                 _phase = TreeConstructionPhase.Main;
-                if (_openElements.First.Value.name != _tokenizer.Name) {
+                Token currentNode = _openElements.First.Value;
+                _openElements.RemoveFirst();
+                if (currentNode.name != _tokenizer.Name) {
                     OnParseError(
                         String.Concat("CDATA or RCDATA ends with an end tag with unexpected name: ",
-                            _tokenizer.Name, ". Expected: ", _openElements.First.Value.name, "."));
-                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                            _tokenizer.Name, ". Expected: ", currentNode.name, "."));
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
                     return CurrentTokenizerTokenState.Ignored;
                 }
                 return CurrentTokenizerTokenState.Emitted;
@@ -536,7 +547,7 @@ namespace Twintsam.Html
                 case "title":
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Rcdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "noscript":
                     // TODO: case when scripting is enabled:
                     //if (_scriptingElabled)
@@ -548,12 +559,12 @@ namespace Twintsam.Html
                 case "style":
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "script":
                     // TODO: script execution
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "head":
                     OnParseError("Unexpected HEAD start tag. Ignored.");
                     return CurrentTokenizerTokenState.Ignored;
@@ -879,7 +890,7 @@ namespace Twintsam.Html
                     ReconstructActiveFormattingElements();
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "table":
                     if (IsInScope("p", false)) {
                         // XXX: that's not what the spec says but it has the same result
@@ -905,9 +916,8 @@ namespace Twintsam.Html
                         // XXX: that's not what the spec says but it has the same result
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("p"));
                     } else {
-                        Debug.Assert(_openElements.First.Value.name == _tokenizer.Name);
-                    _openElements.RemoveFirst();
-                        return InsertHtmlElement();
+                        // XXX: we don't bother adding to and then immediately popping from the stack of open elements.
+                        return CurrentTokenizerTokenState.Emitted;
                     }
                 case "image":
                     OnParseError("Unexpected start tag (image). Treated as img.");
@@ -925,13 +935,13 @@ namespace Twintsam.Html
                 case "textarea":
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Rcdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "iframe":
                 case "noembed":
                 case "noframe":
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Cdata;
-                    return CurrentTokenizerTokenState.Emitted;
+                    return InsertHtmlElement();
                 case "noscript":
                     // TODO: case when scripting is enabled:
                     //_phase = TreeConstructionPhase.CdataOrRcdata;
@@ -978,6 +988,7 @@ namespace Twintsam.Html
                 case "body":
                     if (_fragmentCase
                         && (_openElements.Count > 1 && _openElements.First.Next.Value.name != "body")) {
+                        // XXX: this is duplicated in the case "html" below.
                         OnParseError("???");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1006,10 +1017,13 @@ namespace Twintsam.Html
                     // XXX: similarly to the head end tag, we'll emit the body end tag while emitting the html end tag (i.e. at EOF)
                     return CurrentTokenizerTokenState.Ignored;
                 case "html":
-                    // TODO: fragment case
-                    // XXX: simarly to the body end tag, we'll emit the html end tag in the trailing end phase
-                    // XXX: this is not what the spec says
-                    return CurrentTokenizerTokenState.Ignored;
+                    if (_fragmentCase
+                        && (_openElements.Count > 1 && _openElements.First.Next.Value.name != "body")) {
+                        // XXX: this is the same test as in the case "body" above, so we act as if an end tag with tag name "body" had been seen: parse error and ignore.
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("body"));
                 case "address":
                 case "blockquote":
                 case "center":
@@ -1066,8 +1080,11 @@ namespace Twintsam.Html
                     }
                     if (IsInScope("p", false)) {
                         do {
-                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                            Token currentNode = _openElements.First.Value;
                             _openElements.RemoveFirst();
+                            if (currentNode.name != "p") {
+                                _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
+                            }
                         } while (IsInScope("p", false));
                         return CurrentTokenizerTokenState.Emitted;
                     } else {
@@ -1141,11 +1158,11 @@ namespace Twintsam.Html
                     Token formattingElement = ElementInActiveFormattingElements(_tokenizer.Name);
                     if (formattingElement == null
                         || _openElements.Contains(formattingElement) && !IsInScope(formattingElement.name, false)) {
-                        OnParseError("???");
+                        OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
                         return CurrentTokenizerTokenState.Ignored;
                     }
                     if (!_openElements.Contains(formattingElement)) {
-                        OnParseError("???");
+                        OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
                         _openElements.Remove(formattingElement);
                         return CurrentTokenizerTokenState.Emitted;
                     }
@@ -1175,7 +1192,7 @@ namespace Twintsam.Html
                             token = _openElements.First.Value;
                             _openElements.RemoveFirst();
                         }
-                        _activeFormattingElements.Pop();
+                        ClearActiveFormattingElements();
                     }
                     return CurrentTokenizerTokenState.Emitted;
                 case "caption":
