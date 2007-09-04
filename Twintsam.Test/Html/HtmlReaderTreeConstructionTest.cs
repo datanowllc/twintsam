@@ -40,9 +40,6 @@ namespace Twintsam.Html
             input = input.Replace("\n", Environment.NewLine);
             expectedOutput = expectedOutput.Replace("\n", Environment.NewLine);
 
-            HtmlReader reader = new HtmlReader(new StringReader(input));
-            reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
-
             Trace.WriteLine("Input:");
             Trace.WriteLine(input);
             Trace.WriteLine("");
@@ -58,59 +55,68 @@ namespace Twintsam.Html
             Trace.WriteLine("Expected:");
             Trace.WriteLine(expectedOutput);
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
+
             try {
-                while (reader.Read()) {
-                    if (reader.NodeType == XmlNodeType.EndElement) {
-                        continue;
-                    }
+                using (HtmlReader reader = new HtmlReader(new StringReader(input))) {
+                    reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
-                    actualOutput.Append("| ");
-                    if (reader.Depth > 0) {
-                        actualOutput.Append(' ', reader.Depth * 2);
-                    }
-
-                    switch (reader.NodeType) {
-                    case XmlNodeType.DocumentType:
-                        actualOutput.Append("<!DOCTYPE");
-                        //if (reader.Name.Length > 0) {
-                        actualOutput.Append(' ').Append(reader.Name);
-                        //}
-                        //string publicId = reader.GetAttribute("PUBLIC");
-                        //string systemId = reader.GetAttribute("SYSTEM");
-                        //if (publicId != null) {
-                        //    actualOutput.Append("PUBLIC ")
-                        //    .Append('"').Append(publicId).Append('"');
-                        //} else if (systemId != null) {
-                        //    actualOutput.Append("SYSTEM");
-                        //}
-                        //if (systemId != null) {
-                        //    actualOutput.Append(' ').Append('"').Append(systemId).Append('"');
-                        //}
-                        actualOutput.Append('>');
-                        break;
-                    case XmlNodeType.Element:
-                        actualOutput.Append("<").Append(reader.Name).Append('>');
-                        while (reader.MoveToNextAttribute()) {
-                            actualOutput.AppendLine();
-                            actualOutput.Append("| ");
-                            actualOutput.Append(' ', (reader.Depth - 1) * 2);
-
-                            actualOutput.Append(reader.Name).Append("=\"").Append(reader.Value.Replace("\"", "&quot;")).Append('"');
+                    while (reader.Read()) {
+                        if (reader.NodeType == XmlNodeType.EndElement) {
+                            continue;
                         }
-                        break;
-                    case XmlNodeType.EndElement:
-                        throw new InvalidOperationException("EndElement should have been handled above !?");
-                    case XmlNodeType.Comment:
-                        actualOutput.Append("<!-- ").Append(reader.Value).Append(" -->");
-                        break;
-                    case XmlNodeType.Text:
-                        actualOutput.Append('"').Append(reader.Value.Replace("\"", "&quot;")).Append('"');
-                        break;
-                    default:
-                        Assert.Fail("Unexpected token type: {0}", reader.NodeType);
-                        break;
+
+                        actualOutput.Append("| ");
+                        if (reader.Depth > 0) {
+                            actualOutput.Append(' ', reader.Depth * 2);
+                        }
+
+                        switch (reader.NodeType) {
+                        case XmlNodeType.DocumentType:
+                            actualOutput.Append("<!DOCTYPE");
+                            //if (reader.Name.Length > 0) {
+                            actualOutput.Append(' ').Append(reader.Name);
+                            //}
+                            //string publicId = reader.GetAttribute("PUBLIC");
+                            //string systemId = reader.GetAttribute("SYSTEM");
+                            //if (publicId != null) {
+                            //    actualOutput.Append("PUBLIC ")
+                            //    .Append('"').Append(publicId.Replace("\n", Environment.NewLine)).Append('"');
+                            //} else if (systemId != null) {
+                            //    actualOutput.Append("SYSTEM");
+                            //}
+                            //if (systemId != null) {
+                            //    actualOutput.Append(' ').Append('"').Append(systemId.Replace("\n", Environment.NewLine)).Append('"');
+                            //}
+                            actualOutput.Append('>');
+                            break;
+                        case XmlNodeType.Element:
+                            actualOutput.Append("<").Append(reader.Name).Append('>');
+                            if (reader.MoveToFirstAttribute()) {
+                                do {
+                                    actualOutput.AppendLine();
+                                    actualOutput.Append("| ");
+                                    actualOutput.Append(' ', reader.Depth * 2);
+
+                                    actualOutput.Append(reader.Name).Append("=\"").Append(reader.Value.Replace("\n", Environment.NewLine).Replace("\"", "&quot;")).Append('"');
+                                } while (reader.MoveToNextAttribute());
+                                reader.MoveToElement();
+                            }
+                            break;
+                        case XmlNodeType.EndElement:
+                            throw new InvalidOperationException("EndElement should have been handled above !?");
+                        case XmlNodeType.Comment:
+                            actualOutput.Append("<!-- ").Append(reader.Value.Replace("\n", Environment.NewLine)).Append(" -->");
+                            break;
+                        case XmlNodeType.Whitespace:
+                        case XmlNodeType.Text:
+                            actualOutput.Append('"').Append(reader.Value.Replace("\n", Environment.NewLine).Replace("\"", "&quot;")).Append('"');
+                            break;
+                        default:
+                            Assert.Fail("Unexpected token type: {0}", reader.NodeType);
+                            break;
+                        }
+                        actualOutput.AppendLine();
                     }
-                    actualOutput.AppendLine();
                 }
                 Assert.AreEqual(expectedOutput, actualOutput.ToString().Trim());
                 Assert.AreEqual(parseErrors == null ? 0 : parseErrors.Length,

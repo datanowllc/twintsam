@@ -134,22 +134,11 @@ namespace Twintsam.Html
             OnParseError(e);
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            try {
-                if (disposing) {
-                    // TODO: add flag to eventually not close the tokenizer
-                    // (particularly when it was passed to the constructor)
-                    _tokenizer.Close();
-                }
-            } finally {
-                base.Dispose(disposing);
-            }
-        }
-
         public override void Close()
         {
-            Dispose(true);
+            // TODO: add flag to eventually not close the tokenizer
+            // (particularly when it was passed to the constructor)
+            _tokenizer.Close();
         }
 
         public override bool EOF
