@@ -44,6 +44,8 @@
     <Compile Include="Html\HtmlReaderTest.cs" />
     <Compile Include="Html\HtmlTextTokenizerTest.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.cs" />
+    <Compile Include="Html\LintXmlReader.cs" />
+    <Compile Include="Html\LintXmlReaderTest.cs" />
     <Compile Include="IO\PreambleDetectorTest.cs" />
     <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
