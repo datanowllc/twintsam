@@ -262,15 +262,6 @@ namespace Twintsam.Html
                 return _depth;
             }
         }
-        private void UpdateDepth()
-        {
-            XmlNodeType nodeType = NodeType;
-            if (nodeType == XmlNodeType.Element && !IsEmptyElement) {
-                _depth++;
-            } else if (nodeType == XmlNodeType.EndElement) {
-                _depth--;
-            }
-        }
 
         public override string GetAttribute(int i)
         {
