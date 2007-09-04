@@ -112,7 +112,7 @@ namespace Twintsam.Html
 
             if (_openElements.Count > 0) {
                 string element = _openElements.First.Value.name;
-                if ((omitted != null && !String.Equals(element, omitted, StringComparison.Ordinal))
+                if ((omitted == null || element != omitted)
                     && Constants.HasOptionalEndTag(element)) {
                     _tokenizer.PushToken(Token.CreateEndTag(element));
                     return true;
@@ -263,6 +263,16 @@ namespace Twintsam.Html
                     // an implied end tag has been generated (i.e. a token has been pushed to the tokenizer, ready to be processed).
                     return CurrentTokenizerTokenState.Unprocessed;
                 }
+                // XXX: special case for /head, /body, /frameset and /html
+                if ((_insertionMode == InsertionMode.AfterHead
+                        && _openElements.First.Value.name == "head")
+                    || (_insertionMode == InsertionMode.AfterBody
+                        && _openElements.First.Value.name == "body")
+                    || (_insertionMode == InsertionMode.AfterFrameset
+                        && _openElements.First.Value.name == "frameset")) {
+                    _openElements.RemoveFirst();
+                }
+                // Back to normal processing
                 if (_openElements.Count > 2) {
                     OnParseError("Unexpected end of stream. Missing closing tags.");
                 } else if (_openElements.Count == 2
