@@ -173,15 +173,25 @@ namespace Twintsam.Html
             _attributeIndex = -1;
             _inAttributeValue = false;
 
-            UpdateDepth();
+            if (NodeType == XmlNodeType.Element && !IsEmptyElement) {
+                _depth++;
+            }
 
             if (_pendingOutputTokens.Count > 0) {
                 _pendingOutputTokens.Dequeue();
                 if (_pendingOutputTokens.Count > 0) {
+                    if (NodeType == XmlNodeType.EndElement) {
+                        Debug.Assert(_depth > 0);
+                        _depth--;
+                    }
                     return true;
                 }
                 else if (_currentTokenizerTokenState == CurrentTokenizerTokenState.Emitted)
                 {
+                    if (NodeType == XmlNodeType.EndElement) {
+                        Debug.Assert(_depth > 0);
+                        _depth--;
+                    }
                     return !_tokenizer.EOF;
                 }
             }
@@ -198,6 +208,11 @@ namespace Twintsam.Html
                 }
             } while (_currentTokenizerTokenState != CurrentTokenizerTokenState.Emitted
                     && _pendingOutputTokens.Count == 0);
+
+            if (NodeType == XmlNodeType.EndElement) {
+                Debug.Assert(_depth > 0);
+                _depth--;
+            }
 
             return _pendingOutputTokens.Count > 0 || !_tokenizer.EOF;
         }
