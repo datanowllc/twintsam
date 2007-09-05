@@ -143,7 +143,7 @@ namespace Twintsam.Html
                 }
                 return true;
             } else {
-                Assert.IsEmpty(_openElements);
+                Assert.AreEqual(0, _openElements.Count);
                 return false;
             }
         }
