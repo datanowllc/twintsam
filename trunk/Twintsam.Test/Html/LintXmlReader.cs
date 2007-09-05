@@ -22,6 +22,7 @@ namespace Twintsam.Html
                 throw new ArgumentNullException("reader");
             }
             _reader = reader;
+            Assert.AreEqual(ReadState.Initial, _reader.ReadState);
             _lineInfo = reader as IXmlLineInfo;
         }
 
@@ -132,19 +133,27 @@ namespace Twintsam.Html
 
         public override bool Read()
         {
-            if (_reader.Read()) {
-                if (_reader.NodeType == XmlNodeType.EndElement) {
-                    string openElement = _openElements.Pop();
-                    Assert.AreEqual(_reader.Name, openElement);
+            Assert.IsTrue(ReadState == ReadState.Initial || ReadState == ReadState.Interactive);
+            try {
+                if (_reader.Read()) {
+                    Assert.AreEqual(ReadState.Interactive, ReadState);
+                    if (_reader.NodeType == XmlNodeType.EndElement) {
+                        string openElement = _openElements.Pop();
+                        Assert.AreEqual(_reader.Name, openElement);
+                    }
+                    Assert.AreEqual(_openElements.Count, _reader.Depth);
+                    if (_reader.NodeType == XmlNodeType.Element && !_reader.IsEmptyElement) {
+                        _openElements.Push(_reader.Name);
+                    }
+                    return true;
+                } else {
+                    Assert.AreEqual(ReadState.EndOfFile, ReadState);
+                    Assert.AreEqual(0, _openElements.Count);
+                    return false;
                 }
-                Assert.AreEqual(_openElements.Count, _reader.Depth);
-                if (_reader.NodeType == XmlNodeType.Element && !_reader.IsEmptyElement) {
-                    _openElements.Push(_reader.Name);
-                }
-                return true;
-            } else {
-                Assert.AreEqual(0, _openElements.Count);
-                return false;
+            } catch (XmlException) {
+                Assert.AreEqual(ReadState.Error, ReadState);
+                throw;
             }
         }
 

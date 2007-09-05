@@ -224,7 +224,7 @@ namespace Twintsam.Html
         {
             get
             {
-                if (_pendingOutputTokens.Count > 0 && _attributeIndex >= 0) {
+                if (_pendingOutputTokens.Count > 0) {
                     return ReadState.Interactive;
                 }
                 return _tokenizer.ReadState;
