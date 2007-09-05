@@ -64,11 +64,16 @@ namespace Twintsam.Html
 
             #region ICloneable Membres
 
-            public object Clone()
+            public Token Clone()
             {
                 Token newToken = (Token)this.MemberwiseClone();
                 newToken.attributes = new List<Attribute>(newToken.attributes);
                 return newToken;
+            }
+
+            object ICloneable.Clone()
+            {
+                return Clone();
             }
 
             #endregion

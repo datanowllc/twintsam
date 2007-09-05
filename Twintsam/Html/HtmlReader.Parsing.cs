@@ -34,6 +34,23 @@ namespace Twintsam.Html
             }
             return false;
         }
+
+        private bool IsInScope(Token token, bool inTableScope)
+        {
+            Debug.Assert(token != null && token.tokenType == XmlNodeType.Element);
+
+            foreach (Token openElement in _openElements) {
+                if (token == openElement) {
+                    return true;
+                } else if (openElement.name == "table") {
+                    return false;
+                } else if (!inTableScope && Constants.IsScopingElement(openElement.name)) {
+                    // XXX: html is a scoping element so it will be treated differently depending on whether we're inTableScope or not but still return false in both cases
+                    return false;
+                }
+            }
+            return false;
+        }
         #endregion
 
         #region 8.2.4.3.2. The list of active formatting elements
@@ -44,14 +61,14 @@ namespace Twintsam.Html
         private Stack<LinkedList<Token>> _activeFormattingElements = new Stack<LinkedList<Token>>(
             new LinkedList<Token>[] { new LinkedList<Token>() });
 
-        private Token ElementInActiveFormattingElements(string name)
+        private LinkedListNode<Token> ElementInActiveFormattingElements(string name)
         {
             if (_activeFormattingElements.Count > 0) {
                 for (LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
                     element != null; element = element.Previous) {
                     Debug.Assert(element.Value != null);
                     if (element.Value.name == name) {
-                        return element.Value;
+                        return element;
                     }
                 }
             }
@@ -246,6 +263,25 @@ namespace Twintsam.Html
                 return whitespace;
             } else {
                 return String.Empty;
+            }
+        }
+
+        private void ActAsIfTokenHadBeenSeen(Token token)
+        {
+            _tokenizer.PushToken(token);
+            CurrentTokenizerTokenState state;
+            do {
+                state = ParseToken();
+            } while (state == CurrentTokenizerTokenState.Unprocessed);
+            // This algorithm can't work if processing the token implies processing other tokens as well
+            Debug.Assert(_tokenizer.Token == token);
+#if DEBUG
+            Debug.Assert(_tokenizer.Read());
+#else
+            _tokenizer.Read();
+#endif
+            if (state == CurrentTokenizerTokenState.Emitted) {
+                _pendingOutputTokens.Enqueue(token);
             }
         }
 
@@ -866,14 +902,12 @@ namespace Twintsam.Html
                 case "h6":
                     goto case "p";
                 case "a":
-                    Token a = ElementInActiveFormattingElements("a");
+                    LinkedListNode<Token> a = ElementInActiveFormattingElements("a");
                     if (a != null) {
                         OnParseError("Unexpected start tag (a) implies end tag (a)");
-                        // TODO: act as if an "a" end tag had been seen then remove 'a' from _openElements and _activeFormattingElements.Peek().
-                        _tokenizer.ReplaceToken(Token.CreateEndTag("a"));
-                        ParseToken();
-                        _openElements.Remove(a);
-                        _activeFormattingElements.Peek().Remove(a);
+                        ActAsIfTokenHadBeenSeen(Token.CreateEndTag("a"));
+                        _openElements.Remove(a.Value);
+                        a.List.Remove(a.Value);
                     }
                     ReconstructActiveFormattingElements();
                     _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
@@ -1182,23 +1216,82 @@ namespace Twintsam.Html
                 case "strong":
                 case "tt":
                 case "u":
-                    Token formattingElement = ElementInActiveFormattingElements(_tokenizer.Name);
-                    if (formattingElement == null
-                        || _openElements.Contains(formattingElement) && !IsInScope(formattingElement.name, false)) {
-                        OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
-                        return CurrentTokenizerTokenState.Ignored;
-                    }
-                    if (!_openElements.Contains(formattingElement)) {
-                        OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
-                        _openElements.Remove(formattingElement);
-                        return CurrentTokenizerTokenState.Emitted;
-                    }
-                    Debug.Assert(_openElements.Contains(formattingElement) && IsInScope(formattingElement.name, false));
-                    if (_openElements.First.Value != formattingElement) {
-                        OnParseError("???");
-                    }
-                    // TODO: steps 2 and followings
-                    throw new NotImplementedException();
+                    do {
+                        // Step 1
+                        LinkedListNode<Token> formattingElement = ElementInActiveFormattingElements(_tokenizer.Name);
+                        if (formattingElement == null
+                            || (_openElements.Contains(formattingElement.Value) && !IsInScope(formattingElement.Value, false))) {
+                            OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
+                            return CurrentTokenizerTokenState.Ignored;
+                        }
+                        if (!_openElements.Contains(formattingElement.Value)) {
+                            OnParseError(String.Concat("No matching start tag (", _tokenizer.Name, ")"));
+                            formattingElement.List.Remove(formattingElement);
+                            return CurrentTokenizerTokenState.Emitted;
+                        }
+                        Debug.Assert(_openElements.Contains(formattingElement.Value) && IsInScope(formattingElement.Value, false));
+                        if (_openElements.First.Value != formattingElement.Value) {
+                            OnParseError("???");
+                        }
+                        // Step 4
+                        LinkedListNode<Token> commonAncestor = _openElements.Find(formattingElement.Value).Previous;
+                        // Step 2
+                        LinkedListNode<Token> furthestBlock = commonAncestor;
+                        while (furthestBlock != null
+                            // neither formatting nor phrasing means either scoping or special
+                            && !Constants.IsScopingElement(furthestBlock.Value.name)
+                            && !Constants.IsSpecialElement(furthestBlock.Value.name)) {
+                            furthestBlock = furthestBlock.Previous;
+                        }
+                        // Step 3
+                        if (furthestBlock == null) {
+                            formattingElement.List.Remove(formattingElement);
+                            Token currentNode = _openElements.First.Value;
+                            _openElements.RemoveFirst();
+                            while (currentNode != formattingElement.Value) {
+                                _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
+                                currentNode = _openElements.First.Value;
+                                _openElements.RemoveFirst();
+                            }
+                            return CurrentTokenizerTokenState.Emitted;
+                        }
+                        // Step 5
+                        if (furthestBlock.Previous != null) {
+                            // TODO: remove the furthest block from its parent node
+                            throw new NotImplementedException();
+                        }
+                        // TODO: Step 6
+                        // Step 7 (Substeps 7.1 and 7.8)
+                        for (LinkedListNode<Token> node = furthestBlock.Next, lastNode = furthestBlock;
+                            // Substep 7.3
+                            node.Value == formattingElement.Value;
+                            // Substeps 7.7 and 7.1
+                            lastNode = node, node = node.Next) {
+                            // Substep 7.2
+                            if (!formattingElement.List.Contains(node.Value)) {
+                                _pendingOutputTokens.Enqueue(Token.CreateEndTag(node.Value.name));
+                                _openElements.Remove(node);
+                            } else {
+                                // Substep 7.4
+                                if (lastNode == furthestBlock) {
+                                    // TODO: Substep 7.4
+                                }
+                                // Substep 7.5
+                                Token clone = node.Value.Clone();
+                                formattingElement.List.Find(node.Value).Value = clone;
+                                node.Value = clone;
+                                // TODO: Substep 7.6 (involves reparenting: will be done in the HtmlDocumentBuilder)
+                            }
+                        }
+                        // TODO: Step 8 (involve reparenting: will be done in the HtmlDocumentBuilder)
+                        // Step 9
+                        _pendingOutputTokens.Enqueue(formattingElement.Value);
+                        // TODO: Steps 9, 10 and 11 (involve reparenting: will be done in the HtmlDocumentBuilder)
+                        // TODO: Step 12
+                        // Step 13
+                        formattingElement.List.Remove(formattingElement);
+                        furthestBlock.List.AddBefore(furthestBlock, formattingElement.Value);
+                    } while (true); // Step 14
                 case "button":
                 case "marquee":
                 case "object":
