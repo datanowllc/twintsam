@@ -20,7 +20,9 @@ namespace Twintsam.Html
     public class LintXmlReaderTest
     {
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader1()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<root>text</root>")))) {
@@ -31,7 +33,9 @@ namespace Twintsam.Html
         }
 
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader2()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<root>text1<empty/>text2</root>")))) {
@@ -43,7 +47,9 @@ namespace Twintsam.Html
 
 
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader3()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<root><child>text</child></root>")))) {
@@ -52,8 +58,11 @@ namespace Twintsam.Html
                 }
             }
         }
+
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader4()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<root><!--comment--></root>")))) {
@@ -64,7 +73,9 @@ namespace Twintsam.Html
         }
 
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader5()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<!--comment--><root></root>")))) {
@@ -75,7 +86,9 @@ namespace Twintsam.Html
         }
 
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader6()
         {
             using (LintXmlReader reader = new LintXmlReader(XmlReader.Create(new StringReader("<root></root><!--comment-->")))) {
@@ -86,7 +99,9 @@ namespace Twintsam.Html
         }
 
         [TestMethod]
+#if NUNIT
         [Category("LintXmlReader")]
+#endif
         public void LintXmlReader7()
         {
             XmlReaderSettings settings = new XmlReaderSettings();
