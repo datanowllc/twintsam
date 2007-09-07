@@ -121,6 +121,14 @@ namespace Twintsam.Html
             Init(HtmlTokenizer.Create(reader, fragmentContainer));
             _fragmentCase = true;
         }
+
+        public HtmlReader(HtmlTokenizer tokenizer)
+        {
+            if (tokenizer == null) {
+                throw new ArgumentNullException("tokenizer");
+            }
+            Init(tokenizer);
+        }
         #endregion
 
         private void Init(HtmlTokenizer tokenizer)
