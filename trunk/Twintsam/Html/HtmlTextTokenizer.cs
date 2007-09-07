@@ -174,6 +174,8 @@ namespace Twintsam.Html
             {
                 if (_textToken.Length > 0) {
                     return _textTokenIsWhitespace ? XmlNodeType.Whitespace : XmlNodeType.Text;
+                } else if (_currentParsingFunction == ParsingFunction.Eof) {
+                    return XmlNodeType.None;
                 }
                 return _tokenType;
             }
@@ -183,7 +185,7 @@ namespace Twintsam.Html
         {
             get
             {
-                if (_textToken.Length > 0) {
+                if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                     return String.Empty;
                 }
                 return _name ?? String.Empty;
@@ -194,7 +196,7 @@ namespace Twintsam.Html
         {
             get
             {
-                if (_textToken.Length > 0) {
+                if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                     return false;
                 }
                 return _trailingSolidus;
@@ -205,7 +207,7 @@ namespace Twintsam.Html
         {
             get
             {
-                if (_textToken.Length > 0) {
+                if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                     return false;
                 }
                 return _incorrectDoctype;
@@ -218,6 +220,8 @@ namespace Twintsam.Html
             {
                 if (_textToken.Length > 0) {
                     return _textToken.ToString();
+                } else if (_currentParsingFunction == ParsingFunction.Eof) {
+                    return String.Empty;
                 }
                 return _value ?? String.Empty;
             }
@@ -227,7 +231,7 @@ namespace Twintsam.Html
         {
             get
             {
-                if (_textToken.Length > 0) {
+                if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                     return 0;
                 }
                 return _attributes.Count;
@@ -236,7 +240,7 @@ namespace Twintsam.Html
 
         public override string GetAttributeName(int index)
         {
-            if (_textToken.Length > 0) {
+            if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                 throw new InvalidOperationException();
             }
             Debug.Assert(_attributes[index].name != null);
@@ -245,7 +249,7 @@ namespace Twintsam.Html
 
         public override char GetAttributeQuoteChar(int index)
         {
-            if (_textToken.Length > 0) {
+            if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                 throw new InvalidOperationException();
             }
 #if DEBUG
@@ -257,7 +261,7 @@ namespace Twintsam.Html
 
         public override string GetAttribute(int index)
         {
-            if (_textToken.Length > 0) {
+            if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                 throw new InvalidOperationException();
             }
             return _attributes[index].value;
@@ -265,7 +269,7 @@ namespace Twintsam.Html
 
         public override int GetAttributeIndex(string name)
         {
-            if (_textToken.Length > 0) {
+            if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                 return -1;
             }
             int index = 0;
@@ -280,7 +284,7 @@ namespace Twintsam.Html
 
         public override string GetAttribute(string name)
         {
-            if (_textToken.Length > 0) {
+            if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                 return null;
             }
             foreach (Attribute attribute in _attributes) {
