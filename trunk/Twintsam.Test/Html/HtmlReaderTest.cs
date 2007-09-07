@@ -24,9 +24,29 @@ namespace Twintsam.Html
 #if NUNIT
         [Category("HtmlReader.ctor")]
 #endif
-        public void ConstructorThrowsExceptionOnNullArgument()
+        public void ConstructorThrowsExceptionOnNullArgument1()
         {
-            new HtmlReader(null);
+            new HtmlReader((HtmlTokenizer)null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+#if NUNIT
+        [Category("HtmlReader.ctor")]
+#endif
+        public void ConstructorThrowsExceptionOnNullArgument2()
+        {
+            new HtmlReader((System.IO.TextReader)null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentNullException))]
+#if NUNIT
+        [Category("HtmlReader.ctor")]
+#endif
+        public void ConstructorThrowsExceptionOnNullArgument3()
+        {
+            new HtmlReader(null, null);
         }
     }
 }
