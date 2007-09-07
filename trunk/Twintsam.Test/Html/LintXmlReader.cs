@@ -138,8 +138,12 @@ namespace Twintsam.Html
                 if (_reader.Read()) {
                     Assert.AreEqual(ReadState.Interactive, ReadState);
                     if (_reader.NodeType == XmlNodeType.EndElement) {
-                        string openElement = _openElements.Pop();
-                        Assert.AreEqual(_reader.Name, openElement);
+                        if (_openElements.Count > 0) {
+                            string openElement = _openElements.Pop();
+                            Assert.AreEqual(_reader.Name, openElement);
+                        } else {
+                            Assert.Fail("No corresponding start tag: " + _reader.Name);
+                        }
                     }
                     Assert.AreEqual(_openElements.Count, _reader.Depth);
                     if (_reader.NodeType == XmlNodeType.Element && !_reader.IsEmptyElement) {
