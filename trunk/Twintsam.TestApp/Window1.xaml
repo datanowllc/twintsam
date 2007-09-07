@@ -1,0 +1,41 @@
+﻿<Window x:Class="Twintsam.TestApp.Window1"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Twintsam.TestApp" Height="380" Width="640" xmlns:my="clr-namespace:System;assembly=mscorlib">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBox Grid.Row="0" Name="HtmlInput" />
+    <Button Grid.Row="1" Click="ParseHtml" Content="Parse" Padding="30,0,30,0" HorizontalAlignment="Center" />
+    <TabControl Grid.Row="2">
+      <TabItem Header="Tokens">
+        <ListView Name="Tokens">
+          <ListView.View>
+            <GridView>
+              <GridViewColumn Header="Token type" DisplayMemberBinding="{Binding Path=Key}" />
+              <GridViewColumn Header="Value" DisplayMemberBinding="{Binding Path=Value}" />
+            </GridView>
+          </ListView.View>
+        </ListView>
+      </TabItem>
+      <TabItem Header="Reconstructed HTML">
+        <TextBox Name="ReconstructedHTML" IsReadOnly="True" />
+      </TabItem>
+      <TabItem Header="Parse errors">
+        <ListView Name="ParseErrors">
+          <ListView.View>
+            <GridView>
+              <GridViewColumn Header="Line" DisplayMemberBinding="{Binding Path=LineNumber}" />
+              <GridViewColumn Header="Column" DisplayMemberBinding="{Binding Path=LinePosition}" />
+              <GridViewColumn Header="Message" DisplayMemberBinding="{Binding Path=Message}" />
+            </GridView>
+          </ListView.View>
+        </ListView>
+      </TabItem>
+    </TabControl>
+  </Grid>
+</Window>
