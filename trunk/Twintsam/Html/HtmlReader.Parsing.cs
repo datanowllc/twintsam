@@ -246,7 +246,7 @@ namespace Twintsam.Html
             case TreeConstructionPhase.CdataOrRcdata:
                 return ParseCdataOrRcdata();
             case TreeConstructionPhase.TrailingEnd:
-                throw new NotImplementedException();
+                return ParseTrailingEnd();
             default:
                 throw new InvalidOperationException();
             }
@@ -528,7 +528,9 @@ namespace Twintsam.Html
                 case InsertionMode.InRow:
                 case InsertionMode.InCell:
                 case InsertionMode.InSelect:
+                    throw new NotImplementedException();
                 case InsertionMode.AfterBody:
+                    return ParseMainAfterBody();
                 case InsertionMode.InFrameset:
                 case InsertionMode.AfterFrameset:
                     throw new NotImplementedException();
@@ -1369,6 +1371,69 @@ namespace Twintsam.Html
                 default:
                     throw new NotImplementedException();
                 }
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        // TODO: table-related and InSelect insertion modes
+
+        private CurrentTokenizerTokenState ParseMainAfterBody()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#after4
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+                // XXX: Process the token as it would be processed if the insertion mode was "in body".
+                return ParseMainInBody();
+            case XmlNodeType.Comment:
+                // TODO: keep the token somewhere, waiting for </html>
+                return CurrentTokenizerTokenState.Emitted;
+            case XmlNodeType.Text:
+                string whitespace = ExtractLeadingWhitespace();
+                if (whitespace.Length > 0) {
+                    _tokenizer.PushToken(Token.CreateWhitespace(whitespace));
+                    goto case XmlNodeType.Whitespace;
+                }
+                goto case XmlNodeType.Element;
+            case XmlNodeType.EndElement:
+                if (_tokenizer.Name == "html") {
+                    // XXX: this is where we emit the </body>
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
+                    return CurrentTokenizerTokenState.Emitted;
+                }
+                goto case XmlNodeType.Element;
+            case XmlNodeType.Element:
+                OnParseError("Non-space characters seen after the body.");
+                _insertionMode = InsertionMode.InBody;
+                return CurrentTokenizerTokenState.Unprocessed;
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private CurrentTokenizerTokenState ParseTrailingEnd()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-trailing
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.DocumentType:
+                OnParseError("DOCTYPE found near the end of the document.");
+                return CurrentTokenizerTokenState.Ignored;
+            case XmlNodeType.Comment:
+                return CurrentTokenizerTokenState.Emitted;
+            case XmlNodeType.Whitespace:
+                // XXX: Process the token as it would be processed in the main phase.
+                return ParseMain();
+            case XmlNodeType.Text:
+            case XmlNodeType.Element:
+            case XmlNodeType.EndElement:
+                // XXX: that's not exact what the draft says wrt leading whitespace in text tokens but it's exactly equivalent
+                OnParseError("Non-space characters in the trailing end");
+                _phase = TreeConstructionPhase.Main;
+                return CurrentTokenizerTokenState.Unprocessed;
             default:
                 throw new InvalidOperationException(
                     String.Concat("Unexpected token type: ",
