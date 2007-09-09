@@ -81,7 +81,7 @@ namespace Twintsam.Html
                 LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
                 if (element != null) {
                     Debug.Assert(element.Value != null);
-                    if (_openElements.Contains(element.Value)) {
+                    if (!_openElements.Contains(element.Value)) {
                         while (element.Previous != null) {
                             element = element.Previous;
                             if (_openElements.Contains(element.Value)) {
@@ -321,19 +321,21 @@ namespace Twintsam.Html
                     return CurrentTokenizerTokenState.Unprocessed;
                 }
                 // XXX: special case for /head, /body, /frameset and /html
-                Token currentNode = _openElements.First.Value;
-                if ((_insertionMode == InsertionMode.AfterHead
-                        && currentNode.name == "head")
-                    || (_insertionMode == InsertionMode.AfterBody
-                        && currentNode.name == "body")
-                    || (_insertionMode == InsertionMode.AfterFrameset
-                        && currentNode.name == "frameset")) {
-                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
-                    _openElements.RemoveFirst();
-                    if (currentNode.name == "head") {
-                        // XXX: create body such that each document has at least ahead and body
-                        _pendingOutputTokens.Enqueue(Token.CreateStartTag("body"));
-                        _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
+                if (_openElements.Count > 0) {
+                    Token currentNode = _openElements.First.Value;
+                    if ((_insertionMode == InsertionMode.AfterHead
+                            && currentNode.name == "head")
+                        || (_insertionMode == InsertionMode.AfterBody
+                            && currentNode.name == "body")
+                        || (_insertionMode == InsertionMode.AfterFrameset
+                            && currentNode.name == "frameset")) {
+                        _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
+                        _openElements.RemoveFirst();
+                        if (currentNode.name == "head") {
+                            // XXX: create body such that each document has at least ahead and body
+                            _pendingOutputTokens.Enqueue(Token.CreateStartTag("body"));
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
+                        }
                     }
                 }
                 // Back to normal processing
@@ -909,7 +911,9 @@ namespace Twintsam.Html
                         OnParseError("Unexpected start tag (a) implies end tag (a)");
                         ActAsIfTokenHadBeenSeen(Token.CreateEndTag("a"));
                         _openElements.Remove(a.Value);
-                        a.List.Remove(a.Value);
+                        if (a.List != null) {
+                            a.List.Remove(a);
+                        }
                     }
                     ReconstructActiveFormattingElements();
                     _activeFormattingElements.Peek().AddLast(_tokenizer.Token);
@@ -1262,7 +1266,8 @@ namespace Twintsam.Html
                             // TODO: remove the furthest block from its parent node
                             throw new NotImplementedException();
                         }
-                        // TODO: Step 6
+                        // Step 6
+                        LinkedListNode<Token> bookmark = formattingElement;
                         // Step 7 (Substeps 7.1 and 7.8)
                         for (LinkedListNode<Token> node = furthestBlock.Next, lastNode = furthestBlock;
                             // Substep 7.3
@@ -1276,12 +1281,9 @@ namespace Twintsam.Html
                             } else {
                                 // Substep 7.4
                                 if (lastNode == furthestBlock) {
-                                    // TODO: Substep 7.4
+                                    bookmark = _activeFormattingElements.Peek().Find(node.Value);
                                 }
-                                // Substep 7.5
-                                Token clone = node.Value.Clone();
-                                formattingElement.List.Find(node.Value).Value = clone;
-                                node.Value = clone;
+                                // Substep 7.5: ignore, no need to clone, we're not building a tree here.
                                 // TODO: Substep 7.6 (involves reparenting: will be done in the HtmlDocumentBuilder)
                             }
                         }
@@ -1289,10 +1291,14 @@ namespace Twintsam.Html
                         // Step 9
                         _pendingOutputTokens.Enqueue(formattingElement.Value);
                         // TODO: Steps 9, 10 and 11 (involve reparenting: will be done in the HtmlDocumentBuilder)
-                        // TODO: Step 12
+                        // Step 12
+                        if (bookmark != formattingElement) {
+                            formattingElement.List.Remove(formattingElement);
+                            bookmark.List.AddAfter(bookmark, formattingElement);
+                        }
                         // Step 13
-                        formattingElement.List.Remove(formattingElement);
-                        furthestBlock.List.AddBefore(furthestBlock, formattingElement.Value);
+                        _openElements.Remove(formattingElement.Value);
+                        _openElements.AddBefore(furthestBlock, formattingElement.Value);
                     } while (true); // Step 14
                 case "button":
                 case "marquee":
@@ -1400,7 +1406,11 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 if (_tokenizer.Name == "html") {
                     // XXX: this is where we emit the </body>
+                    Debug.Assert(_openElements.First.Value.name == "body");
+                    _openElements.RemoveFirst();
                     _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
+                    Debug.Assert(_openElements.First.Value.name == "html");
+                    _openElements.RemoveFirst();
                     return CurrentTokenizerTokenState.Emitted;
                 }
                 goto case XmlNodeType.Element;
