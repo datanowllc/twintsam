@@ -89,13 +89,13 @@ namespace Twintsam.Html
             "-//W3C//DTD XHTML 1.0 Frameset//EN", "-//W3C//DTD XHTML 1.0 Transitional//EN",
         };
 
-        private bool _fragmentCase;
-        private Tokenizer _tokenizer;
-        private IXmlLineInfo _lineInfo;
+        private readonly bool _fragmentCase;
+        private /*readonly*/ Tokenizer _tokenizer;
+        private /*readonly*/ IXmlLineInfo _lineInfo;
         private TreeConstructionPhase _phase;
         private InsertionMode _insertionMode;
 
-        private Queue<Token> _pendingOutputTokens = new Queue<Token>();
+        private readonly Queue<Token> _pendingOutputTokens = new Queue<Token>();
         private int _attributeIndex = -1;
         private bool _inAttributeValue;
         private int _depth;
@@ -120,6 +120,9 @@ namespace Twintsam.Html
             }
             Init(HtmlTokenizer.Create(reader, fragmentContainer));
             _fragmentCase = true;
+            _openElements.AddFirst(Token.CreateStartTag("html"));
+            _phase = TreeConstructionPhase.Main;
+            ResetInsertionMode(fragmentContainer.ToLowerInvariant());
         }
 
         public HtmlReader(HtmlTokenizer tokenizer)

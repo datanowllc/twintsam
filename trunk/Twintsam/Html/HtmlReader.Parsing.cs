@@ -153,13 +153,24 @@ namespace Twintsam.Html
 
         #region 8.2.4.3.6. The insertion mode
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#reset
-        private void ResetInsertionMode()
+        private void ResetInsertionMode(string contextNodeName)
         {
-            _insertionMode = InsertionMode.InBody;
             // TODO: step 3 (fragment case)
-            foreach (Token element in _openElements) {
-                switch (element.name) {
+            LinkedListNode<Token> node = _openElements.First;
+            if (node == null) {
+                throw new InvalidOperationException();
+            }
+            do {
+                string nodeName;
+                if (node.Next == null) {
+                    Debug.Assert(_fragmentCase);
+                    nodeName = contextNodeName;
+                } else {
+                    nodeName = node.Value.name;
+                }
+                switch (nodeName) {
                 case "select":
+                    Debug.Assert(_fragmentCase);
                     _insertionMode = InsertionMode.InSelect;
                     return;
                 case "td":
@@ -178,22 +189,35 @@ namespace Twintsam.Html
                     _insertionMode = InsertionMode.InCaption;
                     return;
                 case "colgroup":
+                    Debug.Assert(_fragmentCase);
                     _insertionMode = InsertionMode.InColumnGroup;
                     return;
                 case "table":
                     _insertionMode = InsertionMode.InTable;
                     return;
                 case "head":
+                    Debug.Assert(_fragmentCase);
+                    // "in body"! not "in head"!
+                    _insertionMode = InsertionMode.InBody;
+                    return;
                 case "body":
-                    Debug.Assert(_insertionMode == InsertionMode.InBody);
+                    _insertionMode = InsertionMode.InBody;
                     return;
                 case "frameset":
+                    Debug.Assert(_fragmentCase);
                     _insertionMode = InsertionMode.InFrameset;
                     return;
                 case "html":
                     throw new NotImplementedException();
+                default:
+                    node = node.Next;
+                    break;
                 }
-            }
+            } while (node != null);
+            
+            // Step 15
+            Debug.Assert(_fragmentCase);
+            _insertionMode = InsertionMode.InBody;
         }
         #endregion
 
@@ -323,6 +347,7 @@ namespace Twintsam.Html
                 OnParseError("Unexpected end of stream in CDATA or RCDATA");
                 Debug.Assert(Constants.IsCdataElement(_openElements.First.Value.name)
                     || Constants.IsRcdataElement(_openElements.First.Value.name));
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 _openElements.RemoveFirst();
                 _phase = TreeConstructionPhase.Main;
                 goto case TreeConstructionPhase.Main;
@@ -332,7 +357,7 @@ namespace Twintsam.Html
                     // an implied end tag has been generated (i.e. a token has been pushed to the tokenizer, ready to be processed).
                     return CurrentTokenizerTokenState.Unprocessed;
                 }
-                // XXX: special case for /head, /body, /frameset and /html
+                // XXX: special case for /head, /body and /frameset
                 if (_openElements.Count > 0) {
                     Token currentNode = _openElements.First.Value;
                     if ((_insertionMode == InsertionMode.AfterHead
@@ -364,6 +389,11 @@ namespace Twintsam.Html
                     // XXX: imply an empty body such that every produced document has at least a body
                     InsertHtmlElement(Token.CreateStartTag("body"));
                 }
+                // XXX: remove the "html" root in the "fragment case"
+                if (_fragmentCase) {
+                    Debug.Assert(_openElements.Last.Value.name == "html");
+                    _openElements.RemoveLast();
+                }
                 // XXX: generate end tags for each open element
                 while (_openElements.First != null) {
                     Token token = _openElements.First.Value;
@@ -376,7 +406,13 @@ namespace Twintsam.Html
                 }
                 return CurrentTokenizerTokenState.Emitted;
             case TreeConstructionPhase.TrailingEnd:
-                // Nothing to do
+                // XXX: special case for /html
+                Debug.Assert(_openElements.Count <= 1);
+                foreach (Token token in _openElements) {
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                }
+                _openElements.Clear();
+                // Back to normal processing: nothing to do
                 return CurrentTokenizerTokenState.Emitted;
             default:
                 throw new InvalidOperationException();
@@ -1322,8 +1358,10 @@ namespace Twintsam.Html
                 case "button":
                 case "marquee":
                 case "object":
-                    if (IsInScope(_tokenizer.Name, false) && GenerateImpliedEndTags(null)) {
-                        return CurrentTokenizerTokenState.Unprocessed;
+                    if (IsInScope(_tokenizer.Name, false)) {
+                        if (GenerateImpliedEndTags(null)) {
+                            return CurrentTokenizerTokenState.Unprocessed;
+                        }
                     }
                     if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError(
@@ -1429,8 +1467,13 @@ namespace Twintsam.Html
                     _openElements.RemoveFirst();
                     _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
                     Debug.Assert(_openElements.First.Value.name == "html");
-                    _openElements.RemoveFirst();
-                    return CurrentTokenizerTokenState.Emitted;
+                    if (_fragmentCase) {
+                        OnParseError("Unexpected html end tag in innerHTML");
+                    } else {
+                        _phase = TreeConstructionPhase.TrailingEnd;
+                    }
+                    // In either case, ignore the token: in the non-fragment case, the </html> will be emitted in the trailing end and/or at EOF
+                    return CurrentTokenizerTokenState.Ignored;
                 }
                 goto case XmlNodeType.Element;
             case XmlNodeType.Element:
