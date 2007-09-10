@@ -33,7 +33,7 @@ namespace Twintsam.Html
             parseErrors++;
         }
 
-        private void DoTest(string input, string expectedOutput, string[] parseErrors)
+        private void DoTest(string input, string fragmentContainer, string expectedOutput, string[] parseErrors)
         {
             expectedOutput.Trim();
 
@@ -57,7 +57,13 @@ namespace Twintsam.Html
             StringBuilder actualOutput = new StringBuilder(expectedOutput.Length);
 
             try {
-                using (HtmlReader htmlReader = new HtmlReader(new StringReader(input))) {
+                HtmlReader htmlReader;
+                if (fragmentContainer == null) {
+                    htmlReader = new HtmlReader(new StringReader(input));
+                } else {
+                    htmlReader = new HtmlReader(new StringReader(input), fragmentContainer);
+                }
+                using (htmlReader) {
                     htmlReader.ParseError += new EventHandler<ParseErrorEventArgs>(htmlReader_ParseError);
 
                     using (XmlReader reader = new LintXmlReader(htmlReader)) {

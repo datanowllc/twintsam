@@ -12,7 +12,7 @@ namespace Twintsam.Html
     {
         internal class Attribute : Twintsam.Html.Attribute
         {
-            public bool isDuplicate;
+            public readonly bool isDuplicate;
             public Attribute(string name, IXmlLineInfo lineInfo)
                 : this(name, false, lineInfo) { }
 
@@ -74,9 +74,8 @@ namespace Twintsam.Html
             Complete,
         }
 
-#if DEBUG
-        private bool _isFragmentParser;
-#endif
+        private readonly bool _isFragmentParser;
+
         private HtmlTextReader _input;
         private XmlNameTable _nameTable;
 
@@ -114,16 +113,36 @@ namespace Twintsam.Html
             _input.ParseError += new EventHandler<ParseErrorEventArgs>(input_ParseError);
         }
 
-        public HtmlTextTokenizer(TextReader input, string lastEmittedStartTagName) : this(input)
+        public HtmlTextTokenizer(TextReader input, string contextNodeName) : this(input)
         {
-            if (String.IsNullOrEmpty(lastEmittedStartTagName)) {
-                throw new ArgumentNullException("lastEmittedStartTagName");
+            if (String.IsNullOrEmpty(contextNodeName)) {
+                throw new ArgumentNullException("contextNodeName");
             }
-            // TODO: check all chars in lastEmittedStartTagName are valid (first simple check: no space character)
-            _lastEmittedStartTagName = lastEmittedStartTagName.ToLowerInvariant();
-#if DEBUG
             _isFragmentParser = true;
-#endif
+            switch (contextNodeName.ToLowerInvariant()) {
+            case "title":
+            case "textarea":
+                ContentModel = ContentModel.Rcdata;
+                break;
+            case "style":
+            case "script":
+            case "xmp":
+            case "iframe":
+            case "noembed":
+            case "noframes":
+                ContentModel = ContentModel.Cdata;
+                break;
+            case "noscript":
+                // TODO: case when scripting is enabled
+                ContentModel = ContentModel.Pcdata;
+                break;
+            case "plaintext":
+                ContentModel = ContentModel.PlainText;
+                break;
+            default:
+                ContentModel = ContentModel.Pcdata;
+                break;
+            }
         }
         #endregion
 
@@ -458,6 +477,7 @@ namespace Twintsam.Html
         public override void Close()
         {
             _currentParsingFunction = ParsingFunction.ReaderClosed;
+            _input.Close();
         }
 
         #region IXmlLineInfo Membres
@@ -931,8 +951,6 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
-                    // TODO: move the following assertion at the beginning of each three ParseAttributeValueXXX method
-                    Debug.Assert(String.IsNullOrEmpty(_attributes[_attributes.Count - 1].value));
                     // XXX: draft says to consume the character and appdn it to the (still empty) current attribute's value; we instead let ParseAttributeValueUnquoted consume the whole attribute value
                     Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
                     _currentParsingFunction = ParsingFunction.AttributeValueUnquoted;

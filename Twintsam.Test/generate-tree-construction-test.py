@@ -65,6 +65,12 @@ for line in tests:
 			else:
 				parseErrors.append(line)
 		
+		fragmentContainer = None
+		if line.startswith('#document-fragment'):
+			fragmentContainer = tests.next()
+			line = tests.next()
+			assert line.startswith('#document')
+		
 		outputLines = []
 		for line in tests:
 			if not line:
@@ -82,11 +88,12 @@ for line in tests:
 #endif
 		public void Test_%s_%d()
 		{
-			DoTest("%s", "%s", new string[] { %s });
+			DoTest("%s", %s, "%s", new string[] { %s });
 		}
 		""" % (input.replace('"', '\\"').replace('\n', '\\n'),
 				prefix, prefix, i,
 				input.replace('"', '\\"').replace('\n', '\\n'),
+				fragmentContainer is None and 'null' or '"%s"' % fragmentContainer,
 				expectedOutput.replace('"', '\\"').replace('\n', '\\n'),
 				", ".join(['"%s"' % error.replace('"', '\\"').replace('\n', '\\n') for error in parseErrors])))
 		
