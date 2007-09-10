@@ -331,11 +331,6 @@ namespace Twintsam.Html
                             && currentNode.name == "frameset")) {
                         _pendingOutputTokens.Enqueue(Token.CreateEndTag(currentNode.name));
                         _openElements.RemoveFirst();
-                        if (currentNode.name == "head") {
-                            // XXX: create body such that each document has at least ahead and body
-                            _pendingOutputTokens.Enqueue(Token.CreateStartTag("body"));
-                            _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
-                        }
                     }
                 }
                 // Back to normal processing
@@ -350,11 +345,23 @@ namespace Twintsam.Html
                     && _openElements.First.Next.Value.name != "body") {
                     OnParseError("Unexpected end of stream in HTML fragment.");
                 }
-                // XXX: generate end tags for each open element
-                foreach (Token token in _openElements) {
-                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                // XXX: imply an empty head such that every produced document has at least a head
+                if (_insertionMode == InsertionMode.BeforeHead) {
+                    InsertHtmlElement(Token.CreateStartTag("head"));
+                } else if (_openElements.Count == 1 && _insertionMode == InsertionMode.AfterHead) {
+                    // XXX: imply an empty body such that every produced document has at least a body
+                    InsertHtmlElement(Token.CreateStartTag("body"));
                 }
-                _openElements.Clear();
+                // XXX: generate end tags for each open element
+                while (_openElements.First != null) {
+                    Token token = _openElements.First.Value;
+                    _openElements.RemoveFirst();
+                    _pendingOutputTokens.Enqueue(Token.CreateEndTag(token.name));
+                    // XXX: imply an empty body such that every produced document has at least a body
+                    if (token.name == "head") {
+                        InsertHtmlElement(Token.CreateStartTag("body"));
+                    }
+                }
                 return CurrentTokenizerTokenState.Emitted;
             case TreeConstructionPhase.TrailingEnd:
                 // Nothing to do
