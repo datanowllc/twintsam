@@ -1848,12 +1848,12 @@ namespace Twintsam.Html
                     c = _input.Peek();
                     if (entityNameCharacter.HasCodepoint
                         && (c == ';' || entityNameCharacter.IsMissingSemiColonRecoverable)) {
-                        foundChar = entityNameCharacter;
                         // If in attribute value and next char is not [0-9A-Za-z],
                         // we want to be able to reset to just after the '&'.
                         // Otherwise, we consume the entity and mark the input again for lookup.
                         if (!inAttributeValue
                             || !(('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z'))) {
+                            foundChar = entityNameCharacter;
                             _input.UnsetMark();
                             _input.Mark();
                         }
