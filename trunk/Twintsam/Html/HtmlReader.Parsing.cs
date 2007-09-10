@@ -77,23 +77,35 @@ namespace Twintsam.Html
 
         private void ReconstructActiveFormattingElements()
         {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#reconstruct
             if (_activeFormattingElements.Count > 0) {
-                LinkedListNode<Token> element = _activeFormattingElements.Peek().Last;
-                if (element != null) {
-                    Debug.Assert(element.Value != null);
-                    if (!_openElements.Contains(element.Value)) {
-                        while (element.Previous != null) {
-                            element = element.Previous;
-                            if (_openElements.Contains(element.Value)) {
-                                element = element.Next;
-                                break;
-                            }
+                // Step 3: Let entry be the last (most recently added) element in the list of active formatting elements.
+                LinkedListNode<Token> entry = _activeFormattingElements.Peek().Last;
+                Debug.Assert(entry == null || entry.Value != null);
+                // Step 1: If there are no entries in the list of active formatting elements, then there is nothing to reconstruct; stop this algorithm.
+                // Step 2: If the last (most recently added) entry in the list of active formatting elements is a marker, ...
+                // ...or if it is an element that is in the stack of open elements, then there is nothing to reconstruct; stop this algorithm.
+                if (entry != null && !_openElements.Contains(entry.Value)) {
+                    // Step 4: If there are no entries before entry in the list of active formatting elements, then jump to step 8.
+                    while (entry.Previous != null) {
+                        // Step 5: Let entry be the entry one earlier than entry in the list of active formatting elements.
+                        entry = entry.Previous;
+                        // Step 6: If entry is neither a marker nor an element that is also in the stack of open elements, go to step 4.
+                        if (_openElements.Contains(entry.Value)) {
+                            // Step 7: Let entry be the element one later than entry in the list of active formatting elements.
+                            entry = entry.Next;
+                            break;
                         }
-                        do {
-                            _pendingOutputTokens.Enqueue(element.Value);
-                            element = element.Next;
-                        } while (element != null);
                     }
+                    do {
+                        // Step 8: Perform a shallow clone of the element entry to obtain clone.
+                        // Step 10: Replace the entry for entry in the list with an entry for clone.
+                        entry.Value = entry.Value.Clone();
+                        // Step 9: Append clone to the current node and push it onto the stack of open elements  so that it is the new current node.
+                        InsertHtmlElement(entry.Value);
+                        // Step 7: Let entry be the element one later than entry in the list of active formatting elements.
+                        entry = entry.Next;
+                    } while (entry != null); // Step 11: If the entry for clone in the list of active formatting elements is not the last entry in the list, return to step 7.
                 }
             }
         }
