@@ -374,12 +374,14 @@ namespace Twintsam.Html
                 if (_openElements.Count > 2) {
                     OnParseError("Unexpected end of stream. Missing closing tags.");
                 } else if (_openElements.Count == 2
-                    && _openElements.First.Value.name != "body") {
+                    && _openElements.First.Value.name != "body"
+                    && _openElements.First.Value.name != "head") {
                     OnParseError(
                         String.Concat("Unexpected end of stream. Expected end tag (",
                             _openElements.First.Value.name, ") first."));
                 } else if (_fragmentCase && _openElements.Count > 1
-                    && _openElements.First.Next.Value.name != "body") {
+                    && _openElements.First.Next.Value.name != "body"
+                    && _openElements.First.Next.Value.name != "head") {
                     OnParseError("Unexpected end of stream in HTML fragment.");
                 }
                 // XXX: imply an empty head such that every produced document has at least a head
