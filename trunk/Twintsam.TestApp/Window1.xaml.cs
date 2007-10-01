@@ -35,46 +35,55 @@ namespace Twintsam.TestApp
             ReconstructedHTML.Clear();
             ParseErrors.Items.Clear();
 
-            using (HtmlReader reader = new HtmlReader(new Tokenizer(new HtmlTextTokenizer(new StringReader(HtmlInput.Text)), Tokens))) {
-                reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
-            
-                while (reader.Read()) {
-                    switch (reader.NodeType) {
-                    case XmlNodeType.Text:
-                    case XmlNodeType.Whitespace:
-                    case XmlNodeType.SignificantWhitespace:
-                        ReconstructedHTML.AppendText(reader.Value);
-                        break;
-                    case XmlNodeType.Comment:
-                        ReconstructedHTML.AppendText("<!--");
-                        ReconstructedHTML.AppendText(reader.Value);
-                        ReconstructedHTML.AppendText("-->");
-                        break;
-                    case XmlNodeType.Element:
-                        ReconstructedHTML.AppendText("<");
-                        ReconstructedHTML.AppendText(reader.Name);
-                        if (reader.MoveToFirstAttribute()) {
-                            do {
-                                ReconstructedHTML.AppendText(" ");
-                                ReconstructedHTML.AppendText(reader.Name);
-                                ReconstructedHTML.AppendText("=");
-                                ReconstructedHTML.AppendText(reader.QuoteChar.ToString());
+            using (TextReader stringReader = new StringReader(HtmlInput.Text))
+            {
+                using (HtmlTokenizer tokenizer = new Tokenizer(
+                    Fragment.IsChecked.HasValue && Fragment.IsChecked.Value
+                        ? new HtmlTextTokenizer(stringReader, FragmentContainer.Text)
+                        : new HtmlTextTokenizer(stringReader),
+                    Tokens)) {
+                    using (HtmlReader reader = new HtmlReader(tokenizer)) {
+                        reader.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
+
+                        while (reader.Read()) {
+                            switch (reader.NodeType) {
+                            case XmlNodeType.Text:
+                            case XmlNodeType.Whitespace:
+                            case XmlNodeType.SignificantWhitespace:
                                 ReconstructedHTML.AppendText(reader.Value);
-                                ReconstructedHTML.AppendText(reader.QuoteChar.ToString());
-                            } while (reader.MoveToNextAttribute());
+                                break;
+                            case XmlNodeType.Comment:
+                                ReconstructedHTML.AppendText("<!--");
+                                ReconstructedHTML.AppendText(reader.Value);
+                                ReconstructedHTML.AppendText("-->");
+                                break;
+                            case XmlNodeType.Element:
+                                ReconstructedHTML.AppendText("<");
+                                ReconstructedHTML.AppendText(reader.Name);
+                                if (reader.MoveToFirstAttribute()) {
+                                    do {
+                                        ReconstructedHTML.AppendText(" ");
+                                        ReconstructedHTML.AppendText(reader.Name);
+                                        ReconstructedHTML.AppendText("=");
+                                        ReconstructedHTML.AppendText(reader.QuoteChar.ToString());
+                                        ReconstructedHTML.AppendText(reader.Value);
+                                        ReconstructedHTML.AppendText(reader.QuoteChar.ToString());
+                                    } while (reader.MoveToNextAttribute());
+                                }
+                                ReconstructedHTML.AppendText(">");
+                                break;
+                            case XmlNodeType.EndElement:
+                                ReconstructedHTML.AppendText("</");
+                                ReconstructedHTML.AppendText(reader.Name);
+                                ReconstructedHTML.AppendText(">");
+                                break;
+                            default:
+                                ReconstructedHTML.AppendText("###");
+                                ReconstructedHTML.AppendText(Enum.GetName(typeof(XmlNodeType), reader.NodeType));
+                                ReconstructedHTML.AppendText("###");
+                                break;
+                            }
                         }
-                        ReconstructedHTML.AppendText(">");
-                        break;
-                    case XmlNodeType.EndElement:
-                        ReconstructedHTML.AppendText("</");
-                        ReconstructedHTML.AppendText(reader.Name);
-                        ReconstructedHTML.AppendText(">");
-                        break;
-                    default:
-                        ReconstructedHTML.AppendText("###");
-                        ReconstructedHTML.AppendText(Enum.GetName(typeof(XmlNodeType), reader.NodeType));
-                        ReconstructedHTML.AppendText("###");
-                        break;
                     }
                 }
             }
