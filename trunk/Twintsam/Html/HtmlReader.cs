@@ -118,11 +118,8 @@ namespace Twintsam.Html
             if (reader == null) {
                 throw new ArgumentNullException("reader");
             }
-            Init(HtmlTokenizer.Create(reader, fragmentContainer));
             _fragmentCase = true;
-            _openElements.AddFirst(Token.CreateStartTag("html"));
-            _phase = TreeConstructionPhase.Main;
-            ResetInsertionMode(fragmentContainer.ToLowerInvariant());
+            Init(HtmlTokenizer.Create(reader, fragmentContainer));
         }
 
         public HtmlReader(HtmlTokenizer tokenizer)
@@ -130,6 +127,7 @@ namespace Twintsam.Html
             if (tokenizer == null) {
                 throw new ArgumentNullException("tokenizer");
             }
+            _fragmentCase = tokenizer.IsFragmentTokenizer;
             Init(tokenizer);
         }
         #endregion
@@ -139,6 +137,12 @@ namespace Twintsam.Html
             _lineInfo = tokenizer as IXmlLineInfo;
             tokenizer.ParseError += new EventHandler<ParseErrorEventArgs>(tokenizer_ParseError);
             _tokenizer = new Tokenizer(tokenizer);
+            
+            if (_fragmentCase) {
+                _openElements.AddFirst(Token.CreateStartTag("html"));
+                _phase = TreeConstructionPhase.Main;
+                ResetInsertionMode(tokenizer.FragmentContext.ToLowerInvariant());
+            }
         }
         private void tokenizer_ParseError(object sender, ParseErrorEventArgs e)
         {

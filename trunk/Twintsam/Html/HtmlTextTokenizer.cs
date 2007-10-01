@@ -75,6 +75,7 @@ namespace Twintsam.Html
         }
 
         private readonly bool _isFragmentParser;
+        private readonly string _fragmentContext;
 
         private HtmlTextReader _input;
         private XmlNameTable _nameTable;
@@ -119,7 +120,8 @@ namespace Twintsam.Html
                 throw new ArgumentNullException("contextNodeName");
             }
             _isFragmentParser = true;
-            switch (contextNodeName.ToLowerInvariant()) {
+            _fragmentContext = contextNodeName.ToLowerInvariant();
+            switch (_fragmentContext) {
             case "title":
             case "textarea":
                 ContentModel = ContentModel.Rcdata;
@@ -150,6 +152,9 @@ namespace Twintsam.Html
         {
             OnParseError(e);
         }
+
+        public override bool IsFragmentTokenizer { get { return _isFragmentParser; } }
+        public override string FragmentContext { get { return _fragmentContext; } }
 
         public override ReadState ReadState
         {

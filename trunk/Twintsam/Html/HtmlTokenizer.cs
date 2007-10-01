@@ -20,6 +20,9 @@ namespace Twintsam.Html
         }
         #endregion
 
+        public abstract bool IsFragmentTokenizer { get; }
+        public abstract string FragmentContext { get; }
+
         public abstract ReadState ReadState { get; }
         public abstract bool EOF { get; }
 
