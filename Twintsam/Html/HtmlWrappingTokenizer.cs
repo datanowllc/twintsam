@@ -17,6 +17,9 @@ namespace Twintsam.Html
 
         protected HtmlTokenizer Tokenizer { get { return _tokenizer; } }
 
+        public override bool IsFragmentTokenizer { get { return _tokenizer.IsFragmentTokenizer; } }
+        public override string FragmentContext { get { return _tokenizer.FragmentContext; } }
+
         public override ReadState ReadState
         {
             get { return _tokenizer.ReadState; }
