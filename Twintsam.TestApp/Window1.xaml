@@ -4,14 +4,21 @@
     Title="Twintsam.TestApp" Height="380" Width="640" xmlns:my="clr-namespace:System;assembly=mscorlib">
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="*" />
+	  <RowDefinition Height="Auto" />
+	  <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
+	<Grid.ColumnDefinitions>
+	  <ColumnDefinition Width="Auto" />
+	  <ColumnDefinition Width="*" />
+	</Grid.ColumnDefinitions>
 
-    <TextBox Grid.Row="0" Name="HtmlInput" />
-    <Button Grid.Row="1" Click="ParseHtml" Content="Parse" Padding="30,0,30,0" HorizontalAlignment="Center" />
-    <TabControl Grid.Row="2">
+	<CheckBox Grid.Row="0" Grid.Column="0" Name="Fragment" Padding="5,0,10,0" VerticalAlignment="Center">Fragment</CheckBox>
+	<TextBox Grid.Row="0" Grid.Column="1" Name="FragmentContainer" HorizontalAlignment="Left" AcceptsReturn="False" AcceptsTab="False" Text="div" Margin="2,2,2,2" IsEnabled="{Binding ElementName=Fragment, Path=IsChecked}" />
+    <TextBox Grid.Row="1" Grid.ColumnSpan="2" Name="HtmlInput" AcceptsReturn="True" AcceptsTab="True" Margin="2,2,2,2" />
+    <Button Grid.Row="2" Grid.ColumnSpan="2" Click="ParseHtml" Content="Parse" Padding="30,0,30,0" HorizontalAlignment="Center" Margin="2,2,2,2" />
+	<TabControl Grid.Row="3" Grid.ColumnSpan="2" Margin="2,2,2,2">
       <TabItem Header="Tokens">
         <ListView Name="Tokens">
           <ListView.View>
