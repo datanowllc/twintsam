@@ -581,7 +581,9 @@ namespace Twintsam.Html
                 case InsertionMode.InBody:
                     return ParseMainInBody();
                 case InsertionMode.InTable:
+                    return ParseMainInTable();
                 case InsertionMode.InCaption:
+                    return ParseMainInCaption();
                 case InsertionMode.InColumnGroup:
                 case InsertionMode.InTableBody:
                 case InsertionMode.InRow:
@@ -1435,6 +1437,202 @@ namespace Twintsam.Html
                     return CurrentTokenizerTokenState.Emitted;
                 default:
                     throw new NotImplementedException();
+                }
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private void ClearStackBackToTableContext()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#clear1
+            bool parseError = false;
+            while (_openElements.First.Value.name != "table" && _openElements.First.Value.name != "html") {
+                parseError = true;
+                _openElements.RemoveFirst();
+            }
+            Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
+            if (parseError) {
+                OnParseError("??? found open element(s) while clearing the stack back to a table context.");
+            }
+        }
+
+        private CurrentTokenizerTokenState ParseMainInTable()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-table
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                return CurrentTokenizerTokenState.Emitted;
+            case XmlNodeType.Text:
+                string whitespace = ExtractLeadingWhitespace();
+                if (whitespace.Length > 0) {
+                    _tokenizer.PushToken(Token.CreateWhitespace(whitespace));
+                    goto case XmlNodeType.Whitespace;
+                } else {
+                    OnParseError("???");
+                    // XXX: the "in table" exception will be handled in the "real tree builder algorithm"
+                    return ParseMainInBody();
+                }
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "caption":
+                    ClearStackBackToTableContext();
+                    _activeFormattingElements.Push(new LinkedList<Token>());
+                    _insertionMode = InsertionMode.InCaption;
+                    return InsertHtmlElement();
+                case "colgroup":
+                    ClearStackBackToTableContext();
+                    _insertionMode = InsertionMode.InColumnGroup;
+                    return InsertHtmlElement();
+                case "col":
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("colgroup"));
+                case "tbody":
+                case "tfoot":
+                case "thead":
+                    ClearStackBackToTableContext();
+                    _insertionMode = InsertionMode.InTableBody;
+                    return InsertHtmlElement();
+                case "td":
+                case "th":
+                case "tr":
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("tbody"));
+                case "table":
+                    OnParseError("Table start tag implies end of previous table");
+                    // XXX: do not process an implied end tag if we know p-front that it'll be ignored
+                    if (IsInScope("table", true)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else {
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("table"));
+                    }
+                default:
+                    OnParseError("???");
+                    // XXX: the "in table" exception will be handled in the "real tree builder algorithm"
+                    return ParseMainInBody();
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "table":
+                    if (IsInScope("table", true)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else if (GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    } else {
+                        if (_openElements.First.Value.name != "table") {
+                            OnParseError("Table end tag seen too early");
+                            while (_openElements.First.Value.name != "table") {
+                                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                                _openElements.RemoveFirst();
+                            }
+                        }
+                        // Pop the table element
+                        _openElements.RemoveFirst();
+                        return CurrentTokenizerTokenState.Emitted;
+                    }
+                case "body":
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "html":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                    OnParseError(String.Concat("Found ", _tokenizer.Name, " end tag, expected table."));
+                    return CurrentTokenizerTokenState.Ignored;
+                default:
+                    OnParseError("???");
+                    // XXX: the "in table" exception will be handled in the "real tree builder algorithm"
+                    return ParseMainInBody();
+                }
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private CurrentTokenizerTokenState ParseMainInCaption()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-caption
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Text:
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                return ParseMainInBody();
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                    OnParseError(String.Concat("Found ", _tokenizer.Name, " start tag, implies caption end tag."));
+                    // XXX: do not generate an implied end tag if we knowup-frant that it'll be ignored
+                    if (IsInScope("caption", true)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else {
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("caption"));
+                    }
+                default:
+                    return ParseMainInBody();
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "caption":
+                    if (IsInScope("caption", true)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else if (GenerateImpliedEndTags(null)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    } else {
+                        if (_openElements.First.Value.name != "caption") {
+                            OnParseError("???");
+                            while (_openElements.First.Value.name != "caption") {
+                                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                                _openElements.RemoveFirst();
+                            }
+                        }
+                        // Pop the caption element
+                        _openElements.RemoveFirst();
+                        ClearActiveFormattingElements();
+                        _insertionMode = InsertionMode.InTable;
+                        return CurrentTokenizerTokenState.Emitted;
+                    }
+                case "table":
+                    OnParseError(String.Concat("Found ", _tokenizer.Name, " start tag, implies caption end tag."));
+                    // XXX: do not generate an implied end tag if we knowup-frant that it'll be ignored
+                    if (IsInScope("caption", true)) {
+                        OnParseError("???");
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else {
+                        return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("caption"));
+                    }
+                case "body":
+                case "col":
+                case "colgroup":
+                case "html":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                    OnParseError("???");
+                    return CurrentTokenizerTokenState.Ignored;
+                default:
+                    return ParseMainInBody();
                 }
             default:
                 throw new InvalidOperationException(
