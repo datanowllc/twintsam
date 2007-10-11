@@ -1773,6 +1773,7 @@ namespace Twintsam.Html
                         OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
+                    Debug.Assert(_openElements.First.Value.name == _tokenizer.Name);
                     _openElements.RemoveFirst();
                     _insertionMode = InsertionMode.InTable;
                     return CurrentTokenizerTokenState.Emitted;
@@ -1799,6 +1800,190 @@ namespace Twintsam.Html
                     return CurrentTokenizerTokenState.Ignored;
                 default:
                     return ParseMainInTable();
+                }
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private void ClearStackBackToTableRowContext()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#clear1
+            bool parseError = false;
+            while (_openElements.First.Value.name != "tr" && _openElements.First.Value.name != "html") {
+                parseError = true;
+                _openElements.RemoveFirst();
+            }
+            Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
+            if (parseError) {
+                OnParseError("??? found open element(s) while clearing the stack back to a table row context.");
+            }
+        }
+        private CurrentTokenizerTokenState ParseMainInRow()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-row
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Text:
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                return ParseMainInTable();
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "th":
+                case "td":
+                    ClearStackBackToTableRowContext();
+                    _insertionMode = InsertionMode.InCell;
+                    _activeFormattingElements.Push(new LinkedList<Token>());
+                    return InsertHtmlElement();
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "tbody":
+                case "tfoot":
+                case "thead":
+                case "tr":
+                    // XXX: do not process an implied end tag if we know up-front that it'll be ignored
+                    if (!IsInScope("tr", true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError("Unexpected end tag (tr). Ignored.");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("tr"));
+                default:
+                    return ParseMainInTable();
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "tr":
+                    if (!IsInScope("tr", true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError("Unexpected end tag (tr). Ignored.");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    Debug.Assert(_openElements.First.Value.name == "tr");
+                    _openElements.RemoveFirst();
+                    _insertionMode = InsertionMode.InTable;
+                    return CurrentTokenizerTokenState.Emitted;
+                case "table":
+                    // XXX: do not process an implied end tag if we know up-front that it'll be ignored
+                    if (!IsInScope("tr", true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError("Unexpected end tag (tr). Ignored.");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("tr"));
+                case "tbody":
+                case "tfoot":
+                case "thead":
+                    if (!IsInScope(_tokenizer.Name, true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("tr"));
+                case "body":
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "html":
+                case "td":
+                case "th":
+                    OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                    return CurrentTokenizerTokenState.Ignored;
+                default:
+                    return ParseMainInTable();
+                }
+            default:
+                throw new InvalidOperationException(
+                    String.Concat("Unexpected token type: ",
+                        Enum.GetName(typeof(XmlNodeType), _tokenizer.TokenType)));
+            }
+        }
+
+        private CurrentTokenizerTokenState CloseCell()
+        {
+            if (IsInScope("td", true)) {
+                Debug.Assert(!IsInScope("th", true));
+                return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("td"));
+            } else if (IsInScope("th", true)) {
+                return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("th"));
+            } else {
+                throw new InvalidOperationException();
+            }
+        }
+        private CurrentTokenizerTokenState ParseMainInCell()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-cell
+            switch (_tokenizer.TokenType) {
+            case XmlNodeType.Text:
+            case XmlNodeType.Whitespace:
+            case XmlNodeType.Comment:
+                return ParseMainInBody();
+            case XmlNodeType.Element:
+                switch (_tokenizer.Name) {
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "tbody":
+                case "td":
+                case "tfoot":
+                case "th":
+                case "thead":
+                case "tr":
+                    if (!IsInScope("td", true) && !IsInScope("th", true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored."));
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return CloseCell();
+                default:
+                    return ParseMainInBody();
+                }
+            case XmlNodeType.EndElement:
+                switch (_tokenizer.Name) {
+                case "td":
+                case "th":
+                    if (!IsInScope(_tokenizer.Name, true)) {
+                        Debug.Assert(_fragmentCase);
+                        OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                        return CurrentTokenizerTokenState.Ignored;
+                    } else if (GenerateImpliedEndTags(_tokenizer.Name)) {
+                        return CurrentTokenizerTokenState.Unprocessed;
+                    }
+                    if (_openElements.First.Value.name != _tokenizer.Name) {
+                        OnParseError("???");
+                        do {
+                            _openElements.RemoveFirst();
+                        } while (_openElements.First.Value.name == _tokenizer.Name);
+                    }
+                    _openElements.RemoveFirst();
+                    ClearActiveFormattingElements();
+                    _insertionMode = InsertionMode.InRow;
+                    Debug.Assert(_openElements.First.Value.name == "tr");
+                    return CurrentTokenizerTokenState.Emitted;
+                case "body":
+                case "caption":
+                case "col":
+                case "colgroup":
+                case "html":
+                    OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                    return CurrentTokenizerTokenState.Ignored;
+                case "table":
+                case "tbody":
+                case "tfoot":
+                case "thead":
+                case "tr":
+                    if (!IsInScope(_tokenizer.Name, true)) {
+                        Debug.Assert(_tokenizer.Name == "tbody" || _tokenizer.Name == "tfoot"
+                            || _tokenizer.Name == "thead" || _fragmentCase);
+                        OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    return CloseCell();
+                default:
+                    return ParseMainInBody();
                 }
             default:
                 throw new InvalidOperationException(
