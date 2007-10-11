@@ -121,7 +121,9 @@ namespace Twintsam.Html
         {
             Debug.Assert(_tokenizer.TokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
-            _openElements.AddFirst(_tokenizer.Token);
+            if (!Constants.IsVoidElement(_tokenizer.Name)) {
+                _openElements.AddFirst(_tokenizer.Token);
+            }
             return CurrentTokenizerTokenState.Emitted;
         }
         private void InsertHtmlElement(Token token)
@@ -129,7 +131,9 @@ namespace Twintsam.Html
             Debug.Assert(token != null && token.tokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
             _pendingOutputTokens.Enqueue(token);
-            _openElements.AddFirst(token);
+            if (!Constants.IsVoidElement(token.name)) {
+                _openElements.AddFirst(token);
+            }
         }
         #endregion
 
