@@ -121,9 +121,7 @@ namespace Twintsam.Html
         {
             Debug.Assert(_tokenizer.TokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
-            if (!Constants.IsVoidElement(_tokenizer.Name)) {
-                _openElements.AddFirst(_tokenizer.Token);
-            }
+            _openElements.AddFirst(_tokenizer.Token);
             return CurrentTokenizerTokenState.Emitted;
         }
         private void InsertHtmlElement(Token token)
@@ -131,9 +129,7 @@ namespace Twintsam.Html
             Debug.Assert(token != null && token.tokenType == XmlNodeType.Element);
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#insert
             _pendingOutputTokens.Enqueue(token);
-            if (!Constants.IsVoidElement(token.name)) {
-                _openElements.AddFirst(token);
-            }
+            _openElements.AddFirst(token);
         }
         #endregion
 
@@ -670,10 +666,12 @@ namespace Twintsam.Html
                 switch (_tokenizer.Name) {
                 case "base":
                 case "link":
-                    return InsertHtmlElement();
+                    // XXX: we don't bother adding to and then immediately popping from the stack of open elements.
+                    return CurrentTokenizerTokenState.Emitted;
                 case "meta":
                     // TODO: change charset if needed
-                    return InsertHtmlElement();
+                    // XXX: we don't bother adding to and then immediately popping from the stack of open elements.
+                    return CurrentTokenizerTokenState.Emitted;
                 case "title":
                     _phase = TreeConstructionPhase.CdataOrRcdata;
                     _tokenizer.ContentModel = ContentModel.Rcdata;
