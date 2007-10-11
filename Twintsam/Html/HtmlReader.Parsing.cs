@@ -589,7 +589,9 @@ namespace Twintsam.Html
                 case InsertionMode.InTableBody:
                     return ParseMainInTableBody();
                 case InsertionMode.InRow:
+                    return ParseMainInRow();
                 case InsertionMode.InCell:
+                    return ParseMainInCell();
                 case InsertionMode.InSelect:
                     throw new NotImplementedException();
                 case InsertionMode.AfterBody:
