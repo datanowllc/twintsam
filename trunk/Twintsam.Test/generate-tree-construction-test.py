@@ -94,7 +94,7 @@ namespace Twintsam.Html
 i = 0
 for test in TestData(LinesIterator(tests)):
 		input = test.get("data", "")
-		parseErrors = test.get("errors", "").split("\n")
+		parseErrors = test.get("errors", None) and test["errors"].split("\n") or []
 		fragmentContainer = test.get("document-fragment", None)
 		expectedOutput = test.get("document", "")
 		
