@@ -89,7 +89,6 @@ namespace Twintsam.Html
             "-//W3C//DTD XHTML 1.0 Frameset//EN", "-//W3C//DTD XHTML 1.0 Transitional//EN",
         };
 
-        private readonly bool _fragmentCase;
         private /*readonly*/ Tokenizer _tokenizer;
         private /*readonly*/ IXmlLineInfo _lineInfo;
         private TreeConstructionPhase _phase;
@@ -118,7 +117,6 @@ namespace Twintsam.Html
             if (reader == null) {
                 throw new ArgumentNullException("reader");
             }
-            _fragmentCase = true;
             Init(HtmlTokenizer.Create(reader, fragmentContainer));
         }
 
@@ -127,21 +125,27 @@ namespace Twintsam.Html
             if (tokenizer == null) {
                 throw new ArgumentNullException("tokenizer");
             }
-            _fragmentCase = tokenizer.IsFragmentTokenizer;
             Init(tokenizer);
         }
         #endregion
 
+        private bool FragmentCase
+        {
+            get
+            {
+                return _tokenizer.IsFragmentTokenizer;
+            }
+        }
         private void Init(HtmlTokenizer tokenizer)
         {
             _lineInfo = tokenizer as IXmlLineInfo;
             tokenizer.ParseError += new EventHandler<ParseErrorEventArgs>(tokenizer_ParseError);
             _tokenizer = new Tokenizer(tokenizer);
             
-            if (_fragmentCase) {
+            if (FragmentCase) {
                 _openElements.AddFirst(Token.CreateStartTag("html"));
                 _phase = TreeConstructionPhase.Main;
-                ResetInsertionMode(tokenizer.FragmentContext.ToLowerInvariant());
+                ResetInsertionMode();
             }
         }
         private void tokenizer_ParseError(object sender, ParseErrorEventArgs e)
