@@ -22,7 +22,53 @@ class LinesIterator(object):
 			line = line[:-1]
 		if line.endswith('\r'):
 			line = line[:-1]
-		return line
+		return line + "\n"
+
+class DefaultDict(dict):
+    def __init__(self, default, *args, **kwargs):
+        self.default = default
+        dict.__init__(self, *args, **kwargs)
+    
+    def __getitem__(self, key):
+        return dict.get(self, key, self.default)
+
+class TestData(object):
+    def __init__(self, f, newTestHeading="data"):
+        self.f = f
+        self.newTestHeading = newTestHeading
+    
+    def __iter__(self):
+        data = DefaultDict(None)
+        key=None
+        for line in self.f:
+            heading = self.isSectionHeading(line)
+            if heading:
+                if data and heading == self.newTestHeading:
+                    #Remove trailing newline
+                    data[key] = data[key][:-1]
+                    yield self.normaliseOutput(data)
+                    data = DefaultDict(None)
+                key = heading
+                data[key]=""
+            elif key is not None:
+                data[key] += line
+        if data:
+            yield self.normaliseOutput(data)
+        
+    def isSectionHeading(self, line):
+        """If the current heading is a test section heading return the heading,
+        otherwise return False"""
+        if line.startswith("#"):
+            return line[1:].strip()
+        else:
+            return False
+    
+    def normaliseOutput(self, data):
+        #Remove trailing newlines
+        for key,value in data.iteritems():
+            if value.endswith("\n"):
+                data[key] = value[:-1]
+        return data
 
 output.write("""
 #if !NUNIT
@@ -45,40 +91,12 @@ namespace Twintsam.Html
     {
 """)
 
-tests = LinesIterator(tests)
-
 i = 0
-for line in tests:
-	if line.startswith('#data'):
-		inputLines = []
-		for line in tests:
-			if line.startswith('#error'):
-				break
-			else:
-				inputLines.append(line)
-		input = '\n'.join(inputLines)
-		
-		parseErrors = []
-		for line in tests:
-			if line.startswith('#document'):
-				break
-			else:
-				parseErrors.append(line)
-		
-		fragmentContainer = None
-		if line.startswith('#document-fragment'):
-			fragmentContainer = tests.next()
-			line = tests.next()
-			assert line.startswith('#document')
-		
-		outputLines = []
-		for line in tests:
-			if not line:
-				# assuming tests are separated by a blank line
-				break
-			else:
-				outputLines.append(line)
-		expectedOutput = '\n'.join(outputLines)
+for test in TestData(LinesIterator(tests)):
+		input = test.get("data", "")
+		parseErrors = test.get("errors", "").split("\n")
+		fragmentContainer = test.get("document-fragment", None)
+		expectedOutput = test.get("document", "")
 		
 		output.write("""
 		[TestMethod]
