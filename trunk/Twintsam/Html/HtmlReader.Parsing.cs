@@ -1522,7 +1522,7 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
                 case "table":
-                    if (IsInScope("table", true)) {
+                    if (!IsInScope("table", true)) {
                         OnParseError("???");
                         return CurrentTokenizerTokenState.Ignored;
                     } else if (GenerateImpliedEndTags(null)) {
@@ -1720,6 +1720,7 @@ namespace Twintsam.Html
             while (_openElements.First.Value.name != "tbody" && _openElements.First.Value.name != "tfoot"
                 && _openElements.First.Value.name != "thead" && _openElements.First.Value.name != "html") {
                 parseError = true;
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 _openElements.RemoveFirst();
             }
             Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
@@ -1816,6 +1817,7 @@ namespace Twintsam.Html
             bool parseError = false;
             while (_openElements.First.Value.name != "tr" && _openElements.First.Value.name != "html") {
                 parseError = true;
+                _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 _openElements.RemoveFirst();
             }
             Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
@@ -1866,7 +1868,7 @@ namespace Twintsam.Html
                     }
                     Debug.Assert(_openElements.First.Value.name == "tr");
                     _openElements.RemoveFirst();
-                    _insertionMode = InsertionMode.InTable;
+                    _insertionMode = InsertionMode.InTableBody;
                     return CurrentTokenizerTokenState.Emitted;
                 case "table":
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
@@ -1957,6 +1959,7 @@ namespace Twintsam.Html
                     if (_openElements.First.Value.name != _tokenizer.Name) {
                         OnParseError("???");
                         do {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                             _openElements.RemoveFirst();
                         } while (_openElements.First.Value.name == _tokenizer.Name);
                     }
