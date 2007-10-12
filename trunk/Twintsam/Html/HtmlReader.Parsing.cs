@@ -153,7 +153,7 @@ namespace Twintsam.Html
 
         #region 8.2.4.3.6. The insertion mode
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#reset
-        private void ResetInsertionMode(string contextNodeName)
+        private void ResetInsertionMode()
         {
             // TODO: step 3 (fragment case)
             LinkedListNode<Token> node = _openElements.First;
@@ -163,14 +163,14 @@ namespace Twintsam.Html
             do {
                 string nodeName;
                 if (node.Next == null) {
-                    Debug.Assert(_fragmentCase);
-                    nodeName = contextNodeName;
+                    Debug.Assert(FragmentCase);
+                    nodeName = _tokenizer.FragmentContext.ToLowerInvariant();
                 } else {
                     nodeName = node.Value.name;
                 }
                 switch (nodeName) {
                 case "select":
-                    Debug.Assert(_fragmentCase);
+                    Debug.Assert(FragmentCase);
                     _insertionMode = InsertionMode.InSelect;
                     return;
                 case "td":
@@ -189,14 +189,14 @@ namespace Twintsam.Html
                     _insertionMode = InsertionMode.InCaption;
                     return;
                 case "colgroup":
-                    Debug.Assert(_fragmentCase);
+                    Debug.Assert(FragmentCase);
                     _insertionMode = InsertionMode.InColumnGroup;
                     return;
                 case "table":
                     _insertionMode = InsertionMode.InTable;
                     return;
                 case "head":
-                    Debug.Assert(_fragmentCase);
+                    Debug.Assert(FragmentCase);
                     // "in body"! not "in head"!
                     _insertionMode = InsertionMode.InBody;
                     return;
@@ -204,7 +204,7 @@ namespace Twintsam.Html
                     _insertionMode = InsertionMode.InBody;
                     return;
                 case "frameset":
-                    Debug.Assert(_fragmentCase);
+                    Debug.Assert(FragmentCase);
                     _insertionMode = InsertionMode.InFrameset;
                     return;
                 case "html":
@@ -216,7 +216,7 @@ namespace Twintsam.Html
             } while (node != null);
             
             // Step 15
-            Debug.Assert(_fragmentCase);
+            Debug.Assert(FragmentCase);
             _insertionMode = InsertionMode.InBody;
         }
         #endregion
@@ -379,7 +379,7 @@ namespace Twintsam.Html
                     OnParseError(
                         String.Concat("Unexpected end of stream. Expected end tag (",
                             _openElements.First.Value.name, ") first."));
-                } else if (_fragmentCase && _openElements.Count > 1
+                } else if (FragmentCase && _openElements.Count > 1
                     && _openElements.First.Next.Value.name != "body"
                     && _openElements.First.Next.Value.name != "head") {
                     OnParseError("Unexpected end of stream in HTML fragment.");
@@ -392,7 +392,7 @@ namespace Twintsam.Html
                     InsertHtmlElement(Token.CreateStartTag("body"));
                 }
                 // XXX: remove the "html" root in the "fragment case"
-                if (_fragmentCase) {
+                if (FragmentCase) {
                     Debug.Assert(_openElements.Last.Value.name == "html");
                     _openElements.RemoveLast();
                 }
@@ -859,7 +859,7 @@ namespace Twintsam.Html
                     OnParseError("Unexpected title start tag in body.");
                     return ParseMainInHead();
                 case "body":
-                    if (_fragmentCase
+                    if (FragmentCase
                         && ((_openElements.Count > 1 && _openElements.First.Next.Value.name != "body")
                             || _openElements.Count == 1)) {
                         return CurrentTokenizerTokenState.Ignored;
@@ -1118,7 +1118,7 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
                 case "body":
-                    if (_fragmentCase
+                    if (FragmentCase
                         && (_openElements.Count > 1 && _openElements.First.Next.Value.name != "body")) {
                         // XXX: this is duplicated in the case "html" below.
                         OnParseError("???");
@@ -1149,7 +1149,7 @@ namespace Twintsam.Html
                     // XXX: similarly to the head end tag, we'll emit the body end tag while emitting the html end tag (i.e. at EOF)
                     return CurrentTokenizerTokenState.Ignored;
                 case "html":
-                    if (_fragmentCase
+                    if (FragmentCase
                         && (_openElements.Count > 1 && _openElements.First.Next.Value.name != "body")) {
                         // XXX: this is the same test as in the case "body" above, so we act as if an end tag with tag name "body" had been seen: parse error and ignore.
                         OnParseError("???");
@@ -1459,7 +1459,7 @@ namespace Twintsam.Html
                 parseError = true;
                 _openElements.RemoveFirst();
             }
-            Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
+            Debug.Assert(_openElements.First.Value.name != "html" || FragmentCase);
             if (parseError) {
                 OnParseError("??? found open element(s) while clearing the stack back to a table context.");
             }
@@ -1508,7 +1508,7 @@ namespace Twintsam.Html
                 case "table":
                     OnParseError("Table start tag implies end of previous table");
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
-                    if (IsInScope("table", true)) {
+                    if (!IsInScope("table", true)) {
                         OnParseError("???");
                         return CurrentTokenizerTokenState.Ignored;
                     } else {
@@ -1535,8 +1535,9 @@ namespace Twintsam.Html
                                 _openElements.RemoveFirst();
                             }
                         }
-                        // Pop the table element
+                        Debug.Assert(_openElements.First.Value.name == "table");
                         _openElements.RemoveFirst();
+                        ResetInsertionMode();
                         return CurrentTokenizerTokenState.Emitted;
                     }
                 case "body":
@@ -1662,7 +1663,7 @@ namespace Twintsam.Html
                 } else {
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
                     if (_openElements.Count == 1) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (colgroup). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1676,7 +1677,7 @@ namespace Twintsam.Html
                 default:
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
                     if (_openElements.Count == 1) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (colgroup). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1686,7 +1687,7 @@ namespace Twintsam.Html
                 switch (_tokenizer.Name) {
                 case "colgroup":
                     if (_openElements.Count == 1) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (colgroup). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1700,7 +1701,7 @@ namespace Twintsam.Html
                 default:
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
                     if (_openElements.Count == 1) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (colgroup)");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1723,7 +1724,7 @@ namespace Twintsam.Html
                 _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 _openElements.RemoveFirst();
             }
-            Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
+            Debug.Assert(_openElements.First.Value.name != "html" || FragmentCase);
             if (parseError) {
                 OnParseError("??? found open element(s) while clearing the stack back to a table body context.");
             }
@@ -1754,7 +1755,7 @@ namespace Twintsam.Html
                 case "tfoot":
                 case "thead":
                     if (!IsInScope("tbody", true) && !IsInScope("tfoot", true) && !IsInScope("thead", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1772,7 +1773,7 @@ namespace Twintsam.Html
                 case "tfoot":
                 case "thead":
                     if (!IsInScope(_tokenizer.Name, true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1782,7 +1783,7 @@ namespace Twintsam.Html
                     return CurrentTokenizerTokenState.Emitted;
                 case "table":
                     if (!IsInScope("tbody", true) && !IsInScope("tfoot", true) && !IsInScope("thead", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1820,7 +1821,7 @@ namespace Twintsam.Html
                 _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 _openElements.RemoveFirst();
             }
-            Debug.Assert(_openElements.First.Value.name != "html" || _fragmentCase);
+            Debug.Assert(_openElements.First.Value.name != "html" || FragmentCase);
             if (parseError) {
                 OnParseError("??? found open element(s) while clearing the stack back to a table row context.");
             }
@@ -1850,7 +1851,7 @@ namespace Twintsam.Html
                 case "tr":
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
                     if (!IsInScope("tr", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (tr). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1862,7 +1863,7 @@ namespace Twintsam.Html
                 switch (_tokenizer.Name) {
                 case "tr":
                     if (!IsInScope("tr", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (tr). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1873,7 +1874,7 @@ namespace Twintsam.Html
                 case "table":
                     // XXX: do not process an implied end tag if we know up-front that it'll be ignored
                     if (!IsInScope("tr", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError("Unexpected end tag (tr). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1882,7 +1883,7 @@ namespace Twintsam.Html
                 case "tfoot":
                 case "thead":
                     if (!IsInScope(_tokenizer.Name, true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1937,7 +1938,7 @@ namespace Twintsam.Html
                 case "thead":
                 case "tr":
                     if (!IsInScope("td", true) && !IsInScope("th", true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -1950,7 +1951,7 @@ namespace Twintsam.Html
                 case "td":
                 case "th":
                     if (!IsInScope(_tokenizer.Name, true)) {
-                        Debug.Assert(_fragmentCase);
+                        Debug.Assert(FragmentCase);
                         OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     } else if (GenerateImpliedEndTags(_tokenizer.Name)) {
@@ -1982,7 +1983,7 @@ namespace Twintsam.Html
                 case "tr":
                     if (!IsInScope(_tokenizer.Name, true)) {
                         Debug.Assert(_tokenizer.Name == "tbody" || _tokenizer.Name == "tfoot"
-                            || _tokenizer.Name == "thead" || _fragmentCase);
+                            || _tokenizer.Name == "thead" || FragmentCase);
                         OnParseError(String.Concat("Unexpected end tag (", _tokenizer.Name, "). Ignored."));
                         return CurrentTokenizerTokenState.Ignored;
                     }
@@ -2023,7 +2024,7 @@ namespace Twintsam.Html
                     _openElements.RemoveFirst();
                     _pendingOutputTokens.Enqueue(Token.CreateEndTag("body"));
                     Debug.Assert(_openElements.First.Value.name == "html");
-                    if (_fragmentCase) {
+                    if (FragmentCase) {
                         OnParseError("Unexpected html end tag in innerHTML");
                     } else {
                         _phase = TreeConstructionPhase.TrailingEnd;
