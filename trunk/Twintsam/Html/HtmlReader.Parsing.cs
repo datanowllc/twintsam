@@ -2024,7 +2024,8 @@ namespace Twintsam.Html
                     return InsertHtmlElement();
                 case "select":
                     OnParseError("Found select start tag inside select. Treat as an end tag instead.");
-                    throw new NotImplementedException();
+                    ActAsIfTokenHadBeenSeen(Token.CreateEndTag("select"));
+                    return CurrentTokenizerTokenState.Ignored;
                 default:
                     OnParseError(String.Concat("Unexpected start tag (", _tokenizer.Name, "). Ignored"));
                     return CurrentTokenizerTokenState.Ignored;
