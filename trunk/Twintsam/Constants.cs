@@ -23,6 +23,8 @@ namespace Twintsam
 
         public static readonly string[] VoidElements = {
             "base", "link", "meta", "hr", "br", "img", "embed", "param", "area", "col", "input",
+            // XXX: not in the spec but needed
+            "frame",
         };
 
         public static readonly string[] CdataElements = { "style", "script", };
