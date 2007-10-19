@@ -35,7 +35,7 @@ namespace Twintsam.IO
                 byte[] preamble = encoding.GetPreamble();
                 Stream stream = new MemoryStream(preamble);
                 Assert.AreSame(encoding, PreambleDetector.Detect(stream));
-                Assert.AreEqual(preamble.Length, stream.Position);
+                Assert.AreEqual((long)preamble.Length, stream.Position);
             }
         }
 
@@ -50,7 +50,7 @@ namespace Twintsam.IO
                         Stream stream = new MemoryStream(preamble);
                         Encoding detected = PreambleDetector.Detect(stream);
                         if (detected == null) {
-                            Assert.AreEqual(0, stream.Position);
+                            Assert.AreEqual(0L, stream.Position);
                         } else {
                             // might be that the preamble is a subset of the detected-encodings preambles
                             Assert.AreNotEqual(encoding, detected);
