@@ -23,6 +23,8 @@ namespace Twintsam.Html
     [TestClass]
     public partial class HtmlTextTokenizerTest
     {
+        private static FieldInfo HtmlTextTokenizer__lastEmittedStartTagName =
+            typeof(HtmlTextTokenizer).GetField("_lastEmittedStartTagName", BindingFlags.Instance | BindingFlags.NonPublic);
         private ArrayList actualOutput = new ArrayList();
 
         private void reader_ParseError(object source, ParseErrorEventArgs args)
@@ -32,15 +34,13 @@ namespace Twintsam.Html
 
         private void DoTest(string input, IList expectedOutput, ContentModel contentModel, string lastStartTag)
         {
-            HtmlTokenizer tokenizer;
-            if (String.IsNullOrEmpty(lastStartTag)) {
-                tokenizer = new HtmlTextTokenizer(new StringReader(input));
-            } else {
-                tokenizer = new HtmlTextTokenizer(new StringReader(input), lastStartTag);
-            }
+            HtmlTokenizer tokenizer = new HtmlTextTokenizer(new StringReader(input));
             tokenizer.ParseError += new EventHandler<ParseErrorEventArgs>(reader_ParseError);
 
             tokenizer.ContentModel = contentModel;
+            if (!String.IsNullOrEmpty(lastStartTag)) {
+                HtmlTextTokenizer__lastEmittedStartTagName.SetValue(tokenizer, lastStartTag);
+            }
 
             Trace.Write("Input: ");
             Trace.WriteLine(input);
