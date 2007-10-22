@@ -57,6 +57,7 @@
     <Compile Include="Html\HtmlWrappingTokenizer.cs" />
     <Compile Include="Html\ParseErrorEventArgs.cs" />
     <Compile Include="Html\CompatibilityMode.cs" />
+    <Compile Include="IO\MetaDetector.cs" />
     <Compile Include="IO\PreambleDetector.cs" />
     <Compile Include="IO\SeekableReadOnlyStream.cs" />
     <Compile Include="IO\StreamChain.cs" />
