@@ -1587,8 +1587,8 @@ namespace Twintsam.Html
                 case "tr":
                     OnParseError(String.Concat("Found ", _tokenizer.Name, " start tag, implies caption end tag."));
                     // XXX: do not generate an implied end tag if we knowup-frant that it'll be ignored
-                    if (IsInScope("caption", true)) {
-                        OnParseError("???");
+                    if (!IsInScope("caption", true)) {
+                        OnParseError("Unexpected end tag (caption). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     } else {
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("caption"));
@@ -1599,8 +1599,8 @@ namespace Twintsam.Html
             case XmlNodeType.EndElement:
                 switch (_tokenizer.Name) {
                 case "caption":
-                    if (IsInScope("caption", true)) {
-                        OnParseError("???");
+                    if (!IsInScope("caption", true)) {
+                        OnParseError("Unexpected end tag (caption). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     } else if (GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
@@ -1619,10 +1619,10 @@ namespace Twintsam.Html
                         return CurrentTokenizerTokenState.Emitted;
                     }
                 case "table":
-                    OnParseError(String.Concat("Found ", _tokenizer.Name, " start tag, implies caption end tag."));
-                    // XXX: do not generate an implied end tag if we knowup-frant that it'll be ignored
-                    if (IsInScope("caption", true)) {
-                        OnParseError("???");
+                    OnParseError(String.Concat("Found ", _tokenizer.Name, " end tag, implies caption end tag."));
+                    // XXX: do not generate an implied end tag if we know up-front that it'll be ignored
+                    if (!IsInScope("caption", true)) {
+                        OnParseError("Unexpected end tag (caption). Ignored.");
                         return CurrentTokenizerTokenState.Ignored;
                     } else {
                         return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("caption"));
