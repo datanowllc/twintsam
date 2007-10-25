@@ -54,7 +54,7 @@ namespace Twintsam.IO
                             && SkipIfCurrentIsAny(stream, 0x41, 0x61 /* aA */) && SkipIfCurrentIsASpace(stream)) {
                             string attributeName;
                             string attributeValue;
-                            while (GetAnAttribute(stream, attributeName, attributeValue)) {
+                            while (GetAnAttribute(stream, out attributeName, out attributeValue)) {
                                 switch (attributeName)
 	                            {
                                 case "charset":
@@ -172,6 +172,9 @@ namespace Twintsam.IO
         private static bool GetAnAttribute(Stream stream, out string attributeName, out string attributeValue)
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-parsing.html#get-an
+            attributeName = null;
+            attributeValue = null;
+
             int next;
             while (true) {
                 next = stream.ReadByte();
@@ -203,7 +206,7 @@ namespace Twintsam.IO
             }
         }
 
-        private string ExtractEncodingFromContentType(string contentType)
+        private static string ExtractEncodingFromContentType(string contentType)
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-content-type-sniffing.html#algorithm3
             throw new NotImplementedException();
