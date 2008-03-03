@@ -12,7 +12,7 @@ namespace Twintsam.Html
             public XmlNodeType tokenType;
             public string name;
             public bool hasTrailingSolidus;
-            public bool isIncorrectDoctype;
+            public bool forceQuirks;
             public string value;
             public List<Attribute> attributes = new List<Attribute>();
 
@@ -225,14 +225,14 @@ namespace Twintsam.Html
                     return base.HasTrailingSolidus;
                 }
             }
-            public override bool IsIncorrectDoctype
+            public override bool ForceQuirks
             {
                 get
                 {
                     if (_pendingToken != null) {
-                        return _pendingToken.isIncorrectDoctype;
+                        return _pendingToken.forceQuirks;
                     }
-                    return base.IsIncorrectDoctype;
+                    return base.ForceQuirks;
                 }
             }
             public override string Name
@@ -313,7 +313,7 @@ namespace Twintsam.Html
                     token.tokenType = Tokenizer.TokenType;
                     token.name = Tokenizer.Name;
                     token.value = Tokenizer.Value;
-                    token.isIncorrectDoctype = Tokenizer.IsIncorrectDoctype;
+                    token.forceQuirks = Tokenizer.ForceQuirks;
                     token.hasTrailingSolidus = Tokenizer.HasTrailingSolidus;
                     HtmlTextTokenizer textTokenizer = Tokenizer as HtmlTextTokenizer;
                     if (textTokenizer != null) {

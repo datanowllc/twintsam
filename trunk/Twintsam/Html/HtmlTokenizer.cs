@@ -33,7 +33,7 @@ namespace Twintsam.Html
         public abstract XmlNodeType TokenType { get; }
         public abstract string Name { get; }
         public abstract bool HasTrailingSolidus { get; }
-        public abstract bool IsIncorrectDoctype { get; }
+        public abstract bool ForceQuirks { get; }
         public abstract string Value { get; }
         public virtual bool HasAttributes { get { return AttributeCount > 0; } }
         public abstract int AttributeCount { get; }
