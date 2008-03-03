@@ -1004,7 +1004,7 @@ namespace Twintsam.Html
                     break;
                 case '&':
                     _input.Read();
-                    string character = ConsumeEntity(true);
+                    string character = ConsumeEntity(true, '"');
                     if (String.IsNullOrEmpty(character)) {
                         _buffer.Append('&');
                     } else {
@@ -1041,7 +1041,7 @@ namespace Twintsam.Html
                     break;
                 case '&':
                     _input.Read();
-                    string character = ConsumeEntity(true);
+                    string character = ConsumeEntity(true, '\'');
                     if (String.IsNullOrEmpty(character)) {
                         _buffer.Append('&');
                     } else {
@@ -1839,8 +1839,18 @@ namespace Twintsam.Html
 
         private string ConsumeEntity(bool inAttributeValue)
         {
+            return ConsumeEntity(inAttributeValue, null);
+        }
+
+        private string ConsumeEntity(bool inAttributeValue, char? additionalAllowedCharacter)
+        {
+            Debug.Assert(!additionalAllowedCharacter.HasValue || (additionalAllowedCharacter == '"') || (additionalAllowedCharacter == '\''));
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#consume
-            switch (_input.Peek()) {
+            int c = _input.Peek();
+            if (additionalAllowedCharacter.HasValue && additionalAllowedCharacter.Value == c) {
+                return null;
+            }
+            switch (c) {
             case '\t':
             case '\n':
             case '\v':
