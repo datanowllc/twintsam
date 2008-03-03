@@ -435,7 +435,7 @@ namespace Twintsam.Html
                     _compatMode = CompatibilityMode.QuirksMode;
                 } else if (_tokenizer.AttributeCount != 0) {
                     OnParseError("DOCTYPE has public and/or system identifier");
-                    if (_tokenizer.IsIncorrectDoctype) {
+                    if (_tokenizer.ForceQuirks) {
                         _compatMode = CompatibilityMode.QuirksMode;
                     }
                     string systemId = _tokenizer.GetAttribute("SYSTEM");
@@ -452,7 +452,7 @@ namespace Twintsam.Html
                             }
                         }
                     }
-                } else if (_tokenizer.IsIncorrectDoctype) {
+                } else if (_tokenizer.ForceQuirks) {
                     _compatMode = CompatibilityMode.QuirksMode;
                 }
                 _phase = TreeConstructionPhase.Root;

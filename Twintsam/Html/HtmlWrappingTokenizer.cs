@@ -56,9 +56,9 @@ namespace Twintsam.Html
             get { return _tokenizer.HasTrailingSolidus; }
         }
 
-        public override bool IsIncorrectDoctype
+        public override bool ForceQuirks
         {
-            get { return _tokenizer.IsIncorrectDoctype; }
+            get { return _tokenizer.ForceQuirks; }
         }
 
         public override string Value

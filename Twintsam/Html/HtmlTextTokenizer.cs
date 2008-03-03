@@ -89,7 +89,7 @@ namespace Twintsam.Html
         private string _value;
         internal List<Attribute> _attributes = new List<Attribute>();
         private bool _trailingSolidus;
-        private bool _incorrectDoctype;
+        private bool _forceQuirks;
 
         private StringBuilder _textToken = new StringBuilder();
         private bool _textTokenIsWhitespace;
@@ -228,14 +228,14 @@ namespace Twintsam.Html
             }
         }
 
-        public override bool IsIncorrectDoctype
+        public override bool ForceQuirks
         {
             get
             {
                 if (_textToken.Length > 0 || _currentParsingFunction == ParsingFunction.Eof) {
                     return false;
                 }
-                return _incorrectDoctype;
+                return _forceQuirks;
             }
         }
 
@@ -527,7 +527,7 @@ namespace Twintsam.Html
             _value = null;
             _attributes.Clear();
             _trailingSolidus = false;
-            _incorrectDoctype = false;
+            _forceQuirks = false;
         }
 
         private void EmitToken()
@@ -1385,14 +1385,14 @@ namespace Twintsam.Html
                     _input.Read();
                     OnParseError("Unexpected end of DOCTYPE before DOCTYPE name");
                     InitToken(XmlNodeType.DocumentType);
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream before DOCTYPE name");
                     InitToken(XmlNodeType.DocumentType);
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1427,7 +1427,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE name");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1459,7 +1459,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE name");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1498,7 +1498,7 @@ namespace Twintsam.Html
                         _input.ResetToMark();
                         _input.Read();
                         OnParseError("Unexpected character after DOCTYPE name");
-                        _incorrectDoctype = true;
+                        _forceQuirks = true;
                         _currentParsingFunction = ParsingFunction.BogusDoctype;
                         break;
                     }
@@ -1530,20 +1530,20 @@ namespace Twintsam.Html
                 case '>':
                     _input.Read();
                     OnParseError("Unexpected end of DOCTYPE before public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream before DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
                     _input.Read();
                     OnParseError("Unexpected character before DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1560,9 +1560,16 @@ namespace Twintsam.Html
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.AfterDoctypePublicId;
                     break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected greater-than sign in DOCTYPE public identifier");
+                    _forceQuirks = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1589,9 +1596,16 @@ namespace Twintsam.Html
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.AfterDoctypePublicId;
                     break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected greater-than sign in DOCTYPE public identifier");
+                    _forceQuirks = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1635,14 +1649,14 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream after DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
                     _input.Read();
                     OnParseError("Unexpected character after DOCTYPE public identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1672,20 +1686,20 @@ namespace Twintsam.Html
                 case '>':
                     _input.Read();
                     OnParseError("Unexpected end of DOCTYPE before system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream before fter DOCTYPE system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
                     _input.Read();
                     OnParseError("Unexpected character before DOCTYPE system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1702,9 +1716,16 @@ namespace Twintsam.Html
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.AfterDoctypeSystemId;
                     break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected greater-than sign in DOCTYPE system identifier");
+                    _forceQuirks = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1731,9 +1752,16 @@ namespace Twintsam.Html
                     _input.Read();
                     _currentParsingFunction = ParsingFunction.AfterDoctypeSystemId;
                     break;
+                case '>':
+                    _input.Read();
+                    OnParseError("Unexpected greater-than sign in DOCTYPE system identifier");
+                    _forceQuirks = true;
+                    EmitToken();
+                    _currentParsingFunction = ParsingFunction.Data;
+                    break;
                 case -1:
                     OnParseError("Unexpected end of stream in DOCTYPE system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
@@ -1769,7 +1797,7 @@ namespace Twintsam.Html
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream after DOCTYPE system identifier");
-                    _incorrectDoctype = true;
+                    _forceQuirks = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;

@@ -48,7 +48,7 @@ namespace Twintsam.Html
                 while (tokenizer.Read()) {
                     switch (tokenizer.TokenType) {
                     case XmlNodeType.DocumentType:
-                        actualOutput.Add(new object[] { "DOCTYPE", tokenizer.Name, tokenizer.GetAttribute("PUBLIC"), tokenizer.GetAttribute("SYSTEM"), !tokenizer.IsIncorrectDoctype });
+                        actualOutput.Add(new object[] { "DOCTYPE", tokenizer.Name, tokenizer.GetAttribute("PUBLIC"), tokenizer.GetAttribute("SYSTEM"), !tokenizer.ForceQuirks });
                         break;
                     case XmlNodeType.Element:
                         Dictionary<string, string> attrs = new Dictionary<string, string>(
