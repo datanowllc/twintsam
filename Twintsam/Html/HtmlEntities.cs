@@ -135,8 +135,8 @@ namespace Twintsam.Html
             CharsToEntityNames.Add('\u2287', "supe");
             CharsToEntityNames.Add('\u22A5', "perp");
             CharsToEntityNames.Add('\u22C5', "sdot");
-            CharsToEntityNames.Add('\u3008', "lang");
-            CharsToEntityNames.Add('\u3009', "rang");
+            CharsToEntityNames.Add('\u27E8', "lang");
+            CharsToEntityNames.Add('\u27E9', "rang");
 
             // Five-chars long entity names
             CharsToEntityNames.Add('\u00A1', "iexcl");
