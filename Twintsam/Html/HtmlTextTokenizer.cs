@@ -563,7 +563,7 @@ namespace Twintsam.Html
                 OnParseError("Not a permitted slash: slash not at end of tag");
             } else if (_tokenType != XmlNodeType.Element) {
                 OnParseError("Not a permitted slash: slash at end of tag but not a start tag");
-            } else if (!Constants.IsVoidElement(_buffer.ToString())) {
+            } else if (!Constants.IsVoidElement(_name)) {
                 OnParseError("Not a permitted slash: slash at end of start tag but not a void element");
             }
         }
@@ -817,6 +817,8 @@ namespace Twintsam.Html
                     break;
                 case '"':
                 case '\'':
+                    // XXX: ParseAttributeName will throw the parse-error for us
+                    goto default;
                 case '=':
                     OnParseError("Invalid character in attribute name");
                     goto default;
@@ -972,7 +974,7 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case '=':
-                    OnParseError("Equal sign in unquoted attribute value");
+                    // XXX: ParseAttributeValueUnquoted will throw the parse error for us.
                     goto default;
                 case -1:
                     OnParseError("Unexpected end of stream before attribute value");
