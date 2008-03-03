@@ -585,7 +585,7 @@ namespace Twintsam.Html
                     }
                     switch (next) {
                     case '&':
-                        if (ContentModel == ContentModel.Pcdata || ContentModel == ContentModel.Rcdata) {
+                        if (!_escapeFlag && (ContentModel == ContentModel.Pcdata || ContentModel == ContentModel.Rcdata)) {
                             _currentParsingFunction = ParsingFunction.EntityData;
                             return;
                         } else {
@@ -1490,6 +1490,7 @@ namespace Twintsam.Html
                         _input.ResetToMark();
                         _input.Read();
                         OnParseError("Unexpected character after DOCTYPE name");
+                        _incorrectDoctype = true;
                         _currentParsingFunction = ParsingFunction.BogusDoctype;
                         break;
                     }
@@ -1534,6 +1535,7 @@ namespace Twintsam.Html
                 default:
                     _input.Read();
                     OnParseError("Unexpected character before DOCTYPE public identifier");
+                    _incorrectDoctype = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1632,6 +1634,7 @@ namespace Twintsam.Html
                 default:
                     _input.Read();
                     OnParseError("Unexpected character after DOCTYPE public identifier");
+                    _incorrectDoctype = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1674,6 +1677,7 @@ namespace Twintsam.Html
                 default:
                     _input.Read();
                     OnParseError("Unexpected character before DOCTYPE system identifier");
+                    _incorrectDoctype = true;
                     _currentParsingFunction = ParsingFunction.BogusDoctype;
                     break;
                 }
@@ -1777,13 +1781,11 @@ namespace Twintsam.Html
                 switch (_input.Peek()) {
                 case '>':
                     _input.Read();
-                    _incorrectDoctype = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 case -1:
                     OnParseError("Unexpected end of stream in bogus DOCTYPE");
-                    _incorrectDoctype = true;
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
