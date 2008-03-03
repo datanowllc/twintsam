@@ -849,8 +849,16 @@ namespace Twintsam.Html
                     _currentParsingFunction = ParsingFunction.AfterAttributeName;
                     break;
                 case '=':
-                    _input.Read();
-                    _currentParsingFunction = ParsingFunction.BeforeAttributeValue;
+                    // XXX: Given that the equal sign has no special treatment in BeforeAttributeName, we need to special case it as the first parsed character
+                    if (_buffer.Length == 0)
+                    {
+                        goto default;
+                    }
+                    else
+                    {
+                        _input.Read();
+                        _currentParsingFunction = ParsingFunction.BeforeAttributeValue;
+                    }
                     break;
                 case '>':
                     _input.Read();
