@@ -43,6 +43,7 @@ namespace Twintsam.Html
             AttributeValueSingleQuoted,
             AttributeValueUnquoted,
             // EntityInAttributeValue: handled "inline" in the ParseAttributeXXX methods
+            AfterAttributeValueQuoted,
             BogusComment,
             MarkupDeclarationOpen,
             CommentStart,
@@ -386,6 +387,9 @@ namespace Twintsam.Html
                     ParseAttributeValueUnquoted();
                     break;
                 // case ParsingFunction.EntityInAttributeValue: handled "inline" in the ParseAttributeXXX methods
+                case ParsingFunction.AfterAttributeValueQuoted:
+                    ParseAfterAttributeValueQuoted();
+                    break;
                 case ParsingFunction.BogusComment:
                     ParseBogusComment();
                     break;
@@ -811,6 +815,11 @@ namespace Twintsam.Html
                     _input.Read();
                     CheckPermittedSlash();
                     break;
+                case '"':
+                case '\'':
+                case '=':
+                    OnParseError("Invalid character in attribute name");
+                    goto default;
                 case -1:
                     OnParseError("Unexpected end of stream before attribute name");
                     EmitToken();
@@ -853,6 +862,10 @@ namespace Twintsam.Html
                     CheckPermittedSlash();
                     _currentParsingFunction = ParsingFunction.BeforeAttributeName;
                     break;
+                case '"':
+                case '\'':
+                    OnParseError("Invalid character in attribute name");
+                    goto default;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute name");
                     EmitToken();
@@ -950,13 +963,16 @@ namespace Twintsam.Html
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
+                case '=':
+                    OnParseError("Equal sign in unquoted attribute value");
+                    goto default;
                 case -1:
                     OnParseError("Unexpected end of stream before attribute value");
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
                 default:
-                    // XXX: draft says to consume the character and appdn it to the (still empty) current attribute's value; we instead let ParseAttributeValueUnquoted consume the whole attribute value
+                    // XXX: draft says to consume the character and append it to the (still empty) current attribute's value; we instead let ParseAttributeValueUnquoted consume the whole attribute value
                     Debug.Assert(_attributes[_attributes.Count - 1].quoteChar == ' ');
                     _currentParsingFunction = ParsingFunction.AttributeValueUnquoted;
                     break;
@@ -976,7 +992,7 @@ namespace Twintsam.Html
                 case '"':
                     _input.Read();
                     _attributes[_attributes.Count - 1].value = _buffer.ToString();
-                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    _currentParsingFunction = ParsingFunction.AfterAttributeValueQuoted;
                     break;
                 case '&':
                     _input.Read();
@@ -1013,7 +1029,7 @@ namespace Twintsam.Html
                 case '\'':
                     _input.Read();
                     _attributes[_attributes.Count - 1].value = _buffer.ToString();
-                    _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                    _currentParsingFunction = ParsingFunction.AfterAttributeValueQuoted;
                     break;
                 case '&':
                     _input.Read();
@@ -1071,6 +1087,11 @@ namespace Twintsam.Html
                     EmitToken();
                     _currentParsingFunction = ParsingFunction.Data;
                     break;
+                case '"':
+                case '\'':
+                case '=':
+                    OnParseError("Equal sign in unquoted attribute value");
+                    goto default;
                 case -1:
                     OnParseError("Unexpected end of stream in attribute value");
                     _attributes[_attributes.Count - 1].value = _buffer.ToString();
@@ -1083,6 +1104,36 @@ namespace Twintsam.Html
                 }
             }
             _buffer.Length = 0;
+        }
+
+        private void ParseAfterAttributeValueQuoted()
+        {
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after0
+            switch (_input.Peek())
+            {
+            case '\t':
+            case '\n':
+            case '\v':
+            case '\f':
+            case ' ':
+                _input.Read();
+                _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                break;
+            case '>':
+                _input.Read();
+                EmitToken();
+                _currentParsingFunction = ParsingFunction.Data;
+                break;
+            case '/':
+                _input.Read();
+                CheckPermittedSlash();
+                _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                break;
+            default:
+                OnParseError("Unexpected character after attribute value");
+                _currentParsingFunction = ParsingFunction.BeforeAttributeName;
+                break;
+            }
         }
 
         private void ParseBogusComment()
@@ -1383,7 +1434,7 @@ namespace Twintsam.Html
 
         private void ParseAfterDoctypeName()
         {
-            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after0
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after1
             while (_currentParsingFunction == ParsingFunction.AfterDoctypeName) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -1549,7 +1600,7 @@ namespace Twintsam.Html
 
         private void ParseAfterDoctypePublicId()
         {
-            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after1
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after2
             while (_currentParsingFunction == ParsingFunction.AfterDoctypePublicId) {
                 switch (_input.Peek()) {
                 case '\t':
@@ -1689,7 +1740,7 @@ namespace Twintsam.Html
 
         private void ParseAfterDoctypeSystemId()
         {
-            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after2
+            // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tokenisation.html#after3
             while (_currentParsingFunction == ParsingFunction.AfterDoctypeSystemId) {
                 switch (_input.Peek()) {
                 case '\t':
