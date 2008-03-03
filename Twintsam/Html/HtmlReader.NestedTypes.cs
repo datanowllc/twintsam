@@ -82,7 +82,7 @@ namespace Twintsam.Html
         private enum TreeConstructionPhase
         {
             Initial,
-            Root,
+            BeforeHtml,
             CdataOrRcdata, // XXX: special phase for the "generic (R)CDATA parsing algorithm
             Main,
             TrailingEnd,

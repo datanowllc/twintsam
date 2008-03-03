@@ -275,8 +275,8 @@ namespace Twintsam.Html
             switch (_phase) {
             case TreeConstructionPhase.Initial:
                 return ParseInitial();
-            case TreeConstructionPhase.Root:
-                return ParseRoot();
+            case TreeConstructionPhase.BeforeHtml:
+                return ParseBeforeHtml();
             case TreeConstructionPhase.Main:
                 return ParseMain();
             case TreeConstructionPhase.CdataOrRcdata:
@@ -334,9 +334,9 @@ namespace Twintsam.Html
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-initial0
                 OnParseError("Unexpected end of stream. Expected DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
-                _phase = TreeConstructionPhase.Root;
-                goto case TreeConstructionPhase.Root;
-            case TreeConstructionPhase.Root:
+                _phase = TreeConstructionPhase.BeforeHtml;
+                goto case TreeConstructionPhase.BeforeHtml;
+            case TreeConstructionPhase.BeforeHtml:
                 // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-root1
                 // XXX: that's not exactly what the spec says, but it has an equivalent result.
                 InsertHtmlElement(Token.CreateStartTag("html"));
@@ -455,7 +455,7 @@ namespace Twintsam.Html
                 } else if (_tokenizer.ForceQuirks) {
                     _compatMode = CompatibilityMode.QuirksMode;
                 }
-                _phase = TreeConstructionPhase.Root;
+                _phase = TreeConstructionPhase.BeforeHtml;
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.Element:
             case XmlNodeType.EndElement:
@@ -463,7 +463,7 @@ namespace Twintsam.Html
                 // XXX: For text tokens, we should extract and ignore leading whitespace, but this will be done in the root phase.
                 OnParseError("Missing DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
-                _phase = TreeConstructionPhase.Root;
+                _phase = TreeConstructionPhase.BeforeHtml;
                 return CurrentTokenizerTokenState.Unprocessed;
             default:
                 throw new InvalidOperationException(
@@ -472,7 +472,7 @@ namespace Twintsam.Html
             }
         }
 
-        private CurrentTokenizerTokenState ParseRoot()
+        private CurrentTokenizerTokenState ParseBeforeHtml()
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#the-root1
             switch (_tokenizer.TokenType) {
