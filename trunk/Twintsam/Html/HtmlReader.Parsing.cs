@@ -1014,6 +1014,7 @@ namespace Twintsam.Html
                     ReconstructActiveFormattingElements();
                     _activeFormattingElements.Push(new LinkedList<Token>());
                     return InsertHtmlElement();
+                case "applet":
                 case "marquee":
                 case "object":
                     ReconstructActiveFormattingElements();
@@ -1366,6 +1367,7 @@ namespace Twintsam.Html
                         _openElements.Remove(formattingElement.Value);
                         _openElements.AddBefore(furthestBlock, formattingElement.Value);
                     } while (true); // Step 14
+                case "applet":
                 case "button":
                 case "marquee":
                 case "object":

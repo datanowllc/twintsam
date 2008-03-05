@@ -42,7 +42,7 @@ namespace Twintsam
         };
 
         public static readonly string[] ScopingElements = {
-            "button", "caption", "html", "marquee", "object", "table", "td", "th",
+            "applet", "button", "caption", "html", "marquee", "object", "table", "td", "th",
         };
 
         public static readonly string[] FormattingElements = {
