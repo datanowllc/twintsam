@@ -79,17 +79,11 @@ namespace Twintsam.Html
             #endregion
         }
 
-        private enum TreeConstructionPhase
+        private enum InsertionMode
         {
             Initial,
             BeforeHtml,
             CdataOrRcdata, // XXX: special phase for the "generic (R)CDATA parsing algorithm
-            Main,
-            TrailingEnd,
-        }
-
-        private enum InsertionMode
-        {
             BeforeHead,
             InHead,
             InHeadNoscript,
@@ -102,9 +96,12 @@ namespace Twintsam.Html
             InRow,
             InCell,
             InSelect,
+            InSelectInTable,
             AfterBody,
             InFrameset,
             AfterFrameset,
+            AfterAfterBody,
+            AfterAfterFrameset,
         }
 
         private enum CurrentTokenizerTokenState
