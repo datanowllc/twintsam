@@ -94,8 +94,8 @@ namespace Twintsam.Html
 
         private /*readonly*/ Tokenizer _tokenizer;
         private /*readonly*/ IXmlLineInfo _lineInfo;
-        private TreeConstructionPhase _phase;
         private InsertionMode _insertionMode;
+        private InsertionMode? _previousInsertionMode;
 
         private readonly Queue<Token> _pendingOutputTokens = new Queue<Token>();
         private int _attributeIndex = -1;
@@ -147,7 +147,6 @@ namespace Twintsam.Html
             
             if (FragmentCase) {
                 _openElements.AddFirst(Token.CreateStartTag("html"));
-                _phase = TreeConstructionPhase.Main;
                 ResetInsertionMode();
             }
         }
