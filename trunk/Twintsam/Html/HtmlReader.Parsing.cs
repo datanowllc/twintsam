@@ -12,7 +12,18 @@ namespace Twintsam.Html
         #region 8.2.4 Tree construction
         private CurrentTokenizerTokenState UseTheRulesFor(InsertionMode insertionMode)
         {
-            throw new NotImplementedException();
+            // FIXME: This algorithm can't work if processing the token implies processing other tokens as well
+            _previousInsertionMode = _insertionMode;
+            _insertionMode = insertionMode;
+            CurrentTokenizerTokenState state;
+            do {
+                state = ParseToken();
+            } while (state == CurrentTokenizerTokenState.Unprocessed);
+            if (_insertionMode == insertionMode) {
+                _insertionMode = _previousInsertionMode.Value;
+            }
+            _previousInsertionMode = null;
+            return state;
         }
         #endregion
 
