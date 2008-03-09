@@ -70,6 +70,7 @@
     <TreeConstructionTestData Include="testdata\tree-construction\tests4.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests5.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests6.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests7.dat" />
   </ItemGroup>
   <ItemGroup>
     <TokenizationTestGenerator Include="generate-tokenization-test.py" />
