@@ -419,6 +419,7 @@ namespace Twintsam.Html
             case XmlNodeType.Element:
             case XmlNodeType.EndElement:
             case XmlNodeType.Text:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 // XXX: For text tokens, we should extract and ignore leading whitespace, but this will be done in the root phase.
                 OnParseError("Missing DOCTYPE.");
                 _compatMode = CompatibilityMode.QuirksMode;
@@ -456,6 +457,7 @@ namespace Twintsam.Html
                 }
             case XmlNodeType.None:
             case XmlNodeType.EndElement:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 InsertHtmlElement(Token.CreateStartTag("html"));
                 _insertionMode = InsertionMode.BeforeHead;
                 return CurrentTokenizerTokenState.Unprocessed;
@@ -526,6 +528,7 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#before5
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
+                Debug.Assert(_tokenizer.EOF);
                 return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("head"));
             case XmlNodeType.Whitespace:
                 return CurrentTokenizerTokenState.Ignored;
@@ -576,6 +579,8 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-head
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
+                Debug.Assert(_tokenizer.EOF);
+                Debug.Assert(!FragmentCase);
                 return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("head"));
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
@@ -653,6 +658,8 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-head0
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
+                Debug.Assert(_tokenizer.EOF);
+                Debug.Assert(!FragmentCase);
                 return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("noscript"));
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
@@ -721,6 +728,7 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#after4
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
+                Debug.Assert(_tokenizer.EOF);
                 return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateStartTag("body"));
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
@@ -1441,7 +1449,10 @@ namespace Twintsam.Html
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
                 Debug.Assert(_tokenizer.EOF);
-                OnParseError("Unexpected end of stream in table.");
+                if (_openElements.Count != 1) {
+                    OnParseError("Unexpected end of stream in table.");
+                }
+                Debug.Assert(FragmentCase || _openElements.Count != 1);
                 // XXX: generate end tags for each open element
                 return EndAllOpenElements();
             case XmlNodeType.Whitespace: // XXX: the "tainted table" case will be handled in the "real tree builder algorithm"
@@ -1562,6 +1573,7 @@ namespace Twintsam.Html
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
             case XmlNodeType.DocumentType:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 return UseTheRulesFor(InsertionMode.InBody);
             case XmlNodeType.Element:
                 switch (_tokenizer.Name) {
@@ -1646,6 +1658,11 @@ namespace Twintsam.Html
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#in-column
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
+                Debug.Assert(_tokenizer.EOF);
+                if (_openElements.Count == 1) {
+                    Debug.Assert(FragmentCase);
+                    return EndAllOpenElements();
+                }
                 return ActAsIfTokenHadBeenSeenThenReprocessCurrentToken(Token.CreateEndTag("colgroup"));
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
@@ -1739,6 +1756,7 @@ namespace Twintsam.Html
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
             case XmlNodeType.DocumentType:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 return UseTheRulesFor(InsertionMode.InTable);
             case XmlNodeType.Element:
                 switch (_tokenizer.Name) {
@@ -1837,6 +1855,7 @@ namespace Twintsam.Html
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
             case XmlNodeType.DocumentType:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 return UseTheRulesFor(InsertionMode.InTable);
             case XmlNodeType.Element:
                 switch (_tokenizer.Name) {
@@ -1931,6 +1950,7 @@ namespace Twintsam.Html
             case XmlNodeType.Whitespace:
             case XmlNodeType.Comment:
             case XmlNodeType.DocumentType:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 return UseTheRulesFor(InsertionMode.InBody);
             case XmlNodeType.Element:
                 switch (_tokenizer.Name) {
@@ -2010,7 +2030,10 @@ namespace Twintsam.Html
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
                 Debug.Assert(_tokenizer.EOF);
-                OnParseError("Unexpected end of stream in select.");
+                if (_openElements.Count != 1) {
+                    OnParseError("Unexpected end of stream in select.");
+                }
+                Debug.Assert(FragmentCase || _openElements.Count != 1);
                 // XXX: generate end tags for each open element
                 return EndAllOpenElements();
             case XmlNodeType.Text:
@@ -2100,6 +2123,7 @@ namespace Twintsam.Html
             case XmlNodeType.Text:
             case XmlNodeType.Comment:
             case XmlNodeType.DocumentType:
+                Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 OnParseError("Unexpected DOCTYPE. Ignored");
                 return CurrentTokenizerTokenState.Ignored;
             case XmlNodeType.Element:
@@ -2203,7 +2227,10 @@ namespace Twintsam.Html
             switch (_tokenizer.TokenType) {
             case XmlNodeType.None:
                 Debug.Assert(_tokenizer.EOF);
-                OnParseError("Unexpected end of stream in frameset.");
+                if (_openElements.Count != 1) {
+                    OnParseError("Unexpected end of stream in frameset.");
+                }
+                Debug.Assert(FragmentCase || _openElements.Count != 1);
                 // XXX: generate end tags for each open element
                 return EndAllOpenElements();
             case XmlNodeType.Whitespace:
