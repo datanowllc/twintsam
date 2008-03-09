@@ -57,6 +57,7 @@
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests4.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests5.dat.cs" />
     <Compile Include="Html\HtmlReaderTreeConstructionTest.tests6.dat.cs" />
+    <Compile Include="Html\HtmlReaderTreeConstructionTest.tests7.dat.cs" />
     <Compile Include="Html\LintXmlReader.cs" />
     <Compile Include="Html\LintXmlReaderTest.cs" />
     <Compile Include="IO\SeekableReadOnlyStreamTest.cs" />
@@ -83,6 +84,7 @@
     <TreeConstructionTestData Include="testdata\tree-construction\tests4.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests5.dat" />
     <TreeConstructionTestData Include="testdata\tree-construction\tests6.dat" />
+    <TreeConstructionTestData Include="testdata\tree-construction\tests7.dat" />
   </ItemGroup>
   <ItemGroup>
     <TokenizationTestGenerator Include="generate-tokenization-test.py" />
