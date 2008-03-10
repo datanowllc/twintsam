@@ -2,8 +2,8 @@
 {
     public enum CompatibilityMode
     {
-        Standards,
-        AlmostStandards,
-        QuirksMode,
+        NoQuirks,
+        LimitedQuirks,
+        Quirks,
     }
 }
