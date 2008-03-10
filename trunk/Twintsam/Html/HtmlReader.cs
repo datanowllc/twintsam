@@ -96,6 +96,8 @@ namespace Twintsam.Html
         private /*readonly*/ IXmlLineInfo _lineInfo;
         private InsertionMode _insertionMode;
         private InsertionMode? _previousInsertionMode;
+        private bool _headParsed;
+        private bool _inForm;
 
         private readonly Queue<Token> _pendingOutputTokens = new Queue<Token>();
         private int _attributeIndex = -1;
