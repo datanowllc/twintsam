@@ -104,7 +104,7 @@ namespace Twintsam.Html
         private bool _inAttributeValue;
         private int _depth;
 
-        private CompatibilityMode _compatMode = CompatibilityMode.Standards;
+        private CompatibilityMode _compatMode = CompatibilityMode.NoQuirks;
 
         #region Constructors
         // TODO: public constructors

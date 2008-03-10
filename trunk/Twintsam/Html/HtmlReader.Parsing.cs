@@ -402,29 +402,29 @@ namespace Twintsam.Html
             case XmlNodeType.DocumentType:
                 if (!String.Equals(_tokenizer.Name, "HTML", StringComparison.OrdinalIgnoreCase)) {
                     OnParseError("DOCTYPE name is not HTML (case-insensitive)");
-                    _compatMode = CompatibilityMode.QuirksMode;
+                    _compatMode = CompatibilityMode.Quirks;
                 } else if (_tokenizer.AttributeCount != 0) {
                     OnParseError("DOCTYPE has public and/or system identifier");
                     if (_tokenizer.ForceQuirks) {
-                        _compatMode = CompatibilityMode.QuirksMode;
+                        _compatMode = CompatibilityMode.Quirks;
                     } else {
                         string systemId = _tokenizer.GetAttribute("SYSTEM");
                         if (systemId != null && String.Equals(systemId, QuirksModeDoctypeSystemId, StringComparison.OrdinalIgnoreCase)) {
-                            _compatMode = CompatibilityMode.QuirksMode;
+                            _compatMode = CompatibilityMode.Quirks;
                         } else {
                             string publicId = _tokenizer.GetAttribute("PUBLIC");
                             if (publicId != null) {
                                 publicId = publicId.ToLowerInvariant();
                                 if (Constants.Is(QuirksModeDoctypePublicIds, publicId)) {
-                                    _compatMode = CompatibilityMode.QuirksMode;
+                                    _compatMode = CompatibilityMode.Quirks;
                                 } else if (Constants.Is(QuirksModeDoctypePublicIdsWhenSystemIdIsMissing, publicId)) {
-                                    _compatMode = (systemId == null) ? CompatibilityMode.QuirksMode : CompatibilityMode.AlmostStandards;
+                                    _compatMode = (systemId == null) ? CompatibilityMode.Quirks : CompatibilityMode.LimitedQuirks;
                                 }
                             }
                         }
                     }
                 } else if (_tokenizer.ForceQuirks) {
-                    _compatMode = CompatibilityMode.QuirksMode;
+                    _compatMode = CompatibilityMode.Quirks;
                 }
                 _insertionMode = InsertionMode.BeforeHtml;
                 return CurrentTokenizerTokenState.Emitted;
@@ -435,7 +435,7 @@ namespace Twintsam.Html
                 Debug.Assert(_tokenizer.TokenType != XmlNodeType.None || _tokenizer.EOF);
                 // XXX: For text tokens, we should extract and ignore leading whitespace, but this will be done in the root phase.
                 OnParseError("Missing DOCTYPE.");
-                _compatMode = CompatibilityMode.QuirksMode;
+                _compatMode = CompatibilityMode.Quirks;
                 _insertionMode = InsertionMode.BeforeHtml;
                 return CurrentTokenizerTokenState.Unprocessed;
             default:
