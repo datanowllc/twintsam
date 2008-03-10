@@ -811,10 +811,6 @@ namespace Twintsam.Html
                     case "body":
                     case "html":
                         break;
-                    case "head":
-                        // XXX: imply an empty body such that every produced document has at least a body
-                        InsertHtmlElement(Token.CreateStartTag("body"));
-                        goto default;
                     default:
                         parseError = true;
                         break;
@@ -1522,10 +1518,9 @@ namespace Twintsam.Html
                 case "input":
                     // TODO: "tainted table"
                     string inputType = _tokenizer.GetAttribute("type");
-                    if (inputType == null || inputType != "hidden") {
+                    if (inputType == null || !String.Equals(inputType, "hidden", StringComparison.OrdinalIgnoreCase)) {
                         goto default;
                     } else {
-                        OnParseError("Unexpected input with a type that is not hidden as a table child");
                         // XXX: don't bother adding and then immediately popping the token from the stack of open elements
                         return CurrentTokenizerTokenState.Emitted;
                     }
