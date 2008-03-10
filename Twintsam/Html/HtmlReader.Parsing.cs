@@ -226,7 +226,9 @@ namespace Twintsam.Html
                     _insertionMode = InsertionMode.InFrameset;
                     return;
                 case "html":
-                    throw new NotImplementedException();
+                    Debug.Assert(FragmentCase);
+                    _insertionMode = _headParsed ? InsertionMode.AfterHead : InsertionMode.BeforeHead;
+                    return;
                 default:
                     node = node.Next;
                     break;
@@ -561,6 +563,7 @@ namespace Twintsam.Html
                 case "html":
                     return UseTheRulesFor(InsertionMode.InBody);
                 case "head":
+                    _headParsed = true;
                     _insertionMode = InsertionMode.InHead;
                     return InsertHtmlElement();
                 default:
@@ -893,6 +896,11 @@ namespace Twintsam.Html
                     goto case "p";
                 case "form":
                     // XXX: no "form element pointer", so no ParseError (will be handle at the "real tree construction stage")
+                    if (_inForm) {
+                        OnParseError("Unexpected form start tag within a form. Ignored.");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    _inForm = true;
                     goto case "p";
                 case "li":
                     if (IsInScope("p", false)) {
@@ -1051,6 +1059,11 @@ namespace Twintsam.Html
                     _openElements.RemoveFirst();
                     return CurrentTokenizerTokenState.Emitted;
                 case "isindex":
+                    if (_inForm) {
+                        OnParseError("Found deprecated isindex start tag. Ignored.");
+                        return CurrentTokenizerTokenState.Ignored;
+                    }
+                    OnParseError("Found deprecated isindex start tag.");
                     throw new NotImplementedException();
                 case "textarea":
                     // XXX: don't micromnage "<textarea>\n" for now
@@ -1172,6 +1185,7 @@ namespace Twintsam.Html
                     }
                     return CurrentTokenizerTokenState.Emitted;
                 case "form":
+                    _inForm = false;
                     if (IsInScope("form", false) && GenerateImpliedEndTags(null)) {
                         return CurrentTokenizerTokenState.Unprocessed;
                     }
@@ -1180,9 +1194,13 @@ namespace Twintsam.Html
                             String.Concat("End tag (", "form",
                                 ") seen too early. Expected other end tag (",
                                 _openElements.First.Value.name, ")."));
-                    } else {
-                        _openElements.RemoveFirst();
+                        while (_openElements.First.Value.name != "form") {
+                            _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
+                            _openElements.RemoveFirst();
+                        }
                     }
+                    // pop the form element from the stack of open elements
+                    _openElements.RemoveFirst();
                     return CurrentTokenizerTokenState.Emitted;
                 case "p":
                     if (IsInScope("p", false) && GenerateImpliedEndTags("p")) {
