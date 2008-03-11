@@ -1537,6 +1537,7 @@ namespace Twintsam.Html
                     if (inputType == null || !String.Equals(inputType, "hidden", StringComparison.OrdinalIgnoreCase)) {
                         goto default;
                     } else {
+                        OnParseError("Unexpected input with a type that is not hidden as a table child");
                         // XXX: don't bother adding and then immediately popping the token from the stack of open elements
                         return CurrentTokenizerTokenState.Emitted;
                     }
