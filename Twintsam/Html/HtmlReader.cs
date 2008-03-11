@@ -95,7 +95,7 @@ namespace Twintsam.Html
         private /*readonly*/ Tokenizer _tokenizer;
         private /*readonly*/ IXmlLineInfo _lineInfo;
         private InsertionMode _insertionMode;
-        private InsertionMode? _previousInsertionMode;
+        private bool _inCdataOrRcdata;
         private bool _headParsed;
         private bool _inForm;
 

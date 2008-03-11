@@ -13,16 +13,15 @@ namespace Twintsam.Html
         private CurrentTokenizerTokenState UseTheRulesFor(InsertionMode insertionMode)
         {
             // FIXME: This algorithm can't work if processing the token implies processing other tokens as well
-            _previousInsertionMode = _insertionMode;
+            InsertionMode previousInsertionMode = _insertionMode;
             _insertionMode = insertionMode;
             CurrentTokenizerTokenState state;
             do {
                 state = ParseToken();
             } while (state == CurrentTokenizerTokenState.Unprocessed);
             if (_insertionMode == insertionMode) {
-                _insertionMode = _previousInsertionMode.Value;
+                _insertionMode = previousInsertionMode;
             }
-            _previousInsertionMode = null;
             return state;
         }
         #endregion
@@ -290,9 +289,11 @@ namespace Twintsam.Html
 
         private CurrentTokenizerTokenState ParseToken()
         {
-            switch (_insertionMode) {
-            case InsertionMode.CdataOrRcdata:
+            if (_inCdataOrRcdata)
+            {
                 return ParseCdataOrRcdata();
+            }
+            switch (_insertionMode) {
             case InsertionMode.Initial:
                 return ParseInitial();
             case InsertionMode.BeforeHtml:
@@ -484,8 +485,7 @@ namespace Twintsam.Html
         private CurrentTokenizerTokenState FollowGenericCdataOrRcdataParsingAlgorithm(ContentModel cdataOrRcdata)
         {
             Debug.Assert(cdataOrRcdata == ContentModel.Cdata || cdataOrRcdata == ContentModel.Rcdata);
-            _previousInsertionMode = _insertionMode;
-            _insertionMode = InsertionMode.CdataOrRcdata;
+            _inCdataOrRcdata = true;
             _tokenizer.ContentModel = cdataOrRcdata;
             // XXX: we're adding the element to the stack of open elements as a way to keep track of its name
             return InsertHtmlElement();
@@ -494,6 +494,7 @@ namespace Twintsam.Html
         private CurrentTokenizerTokenState ParseCdataOrRcdata()
         {
             // http://www.whatwg.org/specs/web-apps/current-work/multipage/section-tree-construction.html#generic0
+            Debug.Assert(_inCdataOrRcdata);
             Debug.Assert(Constants.IsCdataElement(_openElements.First.Value.name)
                 || Constants.IsRcdataElement(_openElements.First.Value.name));
 
@@ -506,17 +507,14 @@ namespace Twintsam.Html
                 _pendingOutputTokens.Enqueue(Token.CreateEndTag(_openElements.First.Value.name));
                 // XXX: pop the element from the stack of open elements (we added it in FollowGenericCdataOrRcdataParsingAlgorithm)
                 _openElements.RemoveFirst();
-                _insertionMode = _previousInsertionMode.Value;
-                _previousInsertionMode = null;
-                // Reprocess with the "real" insertion mode
-                return UseTheRulesFor(_insertionMode);
+                _inCdataOrRcdata = false;
+                return CurrentTokenizerTokenState.Unprocessed;
             case XmlNodeType.Whitespace:
             case XmlNodeType.Text:
                 return CurrentTokenizerTokenState.Emitted;
             case XmlNodeType.EndElement:
                 Debug.Assert(_tokenizer.ContentModel == ContentModel.Pcdata);
-                _insertionMode = _previousInsertionMode.Value;
-                _previousInsertionMode = null;
+                _inCdataOrRcdata = false;
                 // XXX: pop the element from the stack of open elements (we added it in FollowGenericCdataOrRcdataParsingAlgorithm)
                 Token currentNode = _openElements.First.Value;
                 _openElements.RemoveFirst();
